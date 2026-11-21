@@ -64,3 +64,26 @@ Rough estimates, to be measured in Phase 2 once real data is in:
 ## Still open
 
 The columns in `corporate_actions`, `issues` and `fundamentals` are designed from what the website needs. No free source for them has been verified yet, so they may change in Phase 2.
+
+## Applied and verified
+
+Applied to the live project on 21 Nov 2026 through the Supabase SQL editor, from the files on this branch (checksums matched before running).
+
+| Check | Result |
+|---|---|
+| Tables in `public` | 15 |
+| Tables with row level security on | 15 |
+| Read policies | 15, and no write policies |
+| Sectors, indices | 13, 17 |
+| `supabase/tests/security_checks.sql` | 10 of 10 passed on the live database |
+| Database version | PostgreSQL 17.12 |
+
+## How to verify it yourself
+
+1. Supabase dashboard, **Table Editor**: the 15 tables are listed, each marked as RLS enabled.
+2. **SQL Editor**: paste `supabase/tests/security_checks.sql` and run it. Supabase shows a "Potential issues detected" dialog because the script creates a temporary results table; choose **Run without RLS**. Every row should say `true`.
+3. Company seed: repository **Actions**, **Sync companies from NEPSE**. The run summary shows how many companies NEPSE returned and how many are in the database.
+
+## Company seed needs two repository secrets
+
+The seed job reads `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` from **Settings > Secrets and variables > Actions**. Until both exist it stops with a clear message and writes nothing.
