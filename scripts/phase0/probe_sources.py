@@ -246,7 +246,8 @@ def strip_body(result: dict) -> dict:
 
 def context_around(body: str, needle: str, width: int = 90) -> str | None:
     """Visible text around the first occurrence of needle (tags removed)."""
-    text = re.sub(r"<[^>]+>", " ", body)
+    text = re.sub(r"<(script|style)\b.*?</\1>", " ", body, flags=re.S | re.I)
+    text = re.sub(r"<[^>]+>", " ", text)
     text = re.sub(r"\s+", " ", text)
     idx = text.lower().find(needle.lower())
     if idx < 0:
@@ -525,6 +526,8 @@ def probe_merolagani() -> dict:
     }
     robots = get_with_fallback(base + "/robots.txt")
     out["robots"] = strip_body(robots)
+    # A 200 answer is not proof of a rules file; the site may serve an HTML page instead.
+    out["robots"]["looks_like_robots_file"] = "user-agent" in robots["_body"].lower()[:2000]
     page = get_with_fallback(base + "/LatestMarket.aspx")
     entry = strip_body(page)
     entry.update(
@@ -661,7 +664,7 @@ def markdown(report: dict) -> str:
         t = ss["today_share_price"]
         site_row("Sharesansar", "today-share-price", t, f"{t.get('table_rows')} rows; {t.get('as_of_text')}; ACLBSL {t.get('sample_rows', {}).get('ACLBSL')}")
     if "error" not in ml:
-        site_row("Merolagani", "robots.txt", ml["robots"])
+        site_row("Merolagani", "robots.txt", ml["robots"], "real rules file: " + yes_no(ml["robots"].get("looks_like_robots_file")))
         t = ml["latest_market"]
         site_row("Merolagani", "LatestMarket.aspx", t, f"{t.get('table_rows')} rows; {t.get('as_of_text')}")
     if "error" not in na:
