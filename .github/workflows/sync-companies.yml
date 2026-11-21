@@ -1,0 +1,42 @@
+name: Sync companies from NEPSE
+
+# Seeds and refreshes the companies table. Safe to run at any time.
+# Uses the service key, so it runs only in this repository's own Actions.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["phase-1/**"]
+    paths:
+      - "scripts/ingest/sync_companies.py"
+      - "scripts/ingest/common.py"
+      - ".github/workflows/sync-companies.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-companies
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: scripts/ingest/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r scripts/ingest/requirements.txt
+
+      - name: Sync companies
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: python scripts/ingest/sync_companies.py
