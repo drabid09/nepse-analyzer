@@ -1,15 +1,15 @@
 {
-  "run_at_utc": "2026-11-21 06:16:30",
-  "run_at_npt": "2026-11-21 12:01 NPT (Saturday)",
+  "run_at_utc": "2026-11-21 06:27:08",
+  "run_at_npt": "2026-11-21 12:12 NPT (Saturday)",
   "trigger": "push",
   "runner": {
-    "github_runner": "GitHub Actions 1000000000",
+    "github_runner": "GitHub Actions 1000000001",
     "runner_os": "Linux",
-    "ip": "145.132.99.104",
-    "city": "Boydton",
-    "region": "Virginia",
+    "ip": "3.42.157.134",
+    "city": "Boardman",
+    "region": "Oregon",
     "country": "US",
-    "org": "AS8075 Microsoft Corporation"
+    "org": "AS16509 Amazon.com, Inc."
   },
   "sources": {
     "nepalstock": {
@@ -39,7 +39,7 @@
         "user_agent": "honest",
         "reachable": true,
         "status": 200,
-        "seconds": 1.5,
+        "seconds": 1.03,
         "final_url": "https://www.nepalstock.com/",
         "bytes": 2830,
         "content_type": "text/html",
@@ -53,7 +53,7 @@
         "user_agent": "honest",
         "reachable": true,
         "status": 200,
-        "seconds": 1.53,
+        "seconds": 1.04,
         "final_url": "https://www.nepalstock.com/robots.txt",
         "bytes": 2830,
         "content_type": "text/html",
@@ -69,7 +69,7 @@
         "user_agent": "browser",
         "reachable": true,
         "status": 401,
-        "seconds": 1.53,
+        "seconds": 1.04,
         "final_url": "https://www.nepalstock.com/api/nots/nepse-data/market-open",
         "bytes": 87,
         "content_type": "text/html;charset=UTF-8",
@@ -84,7 +84,7 @@
         "calls": {
           "market_status": {
             "ok": true,
-            "seconds": 1.46,
+            "seconds": 1.34,
             "requests": 2,
             "type": "dict",
             "fields": [
@@ -96,7 +96,7 @@
           },
           "nepse_index": {
             "ok": true,
-            "seconds": 0.25,
+            "seconds": 0.27,
             "requests": 1,
             "type": "list",
             "count": 4,
@@ -120,7 +120,7 @@
           },
           "sub_indices": {
             "ok": true,
-            "seconds": 0.25,
+            "seconds": 0.27,
             "requests": 1,
             "type": "list",
             "count": 13,
@@ -135,7 +135,7 @@
           },
           "market_summary": {
             "ok": true,
-            "seconds": 0.25,
+            "seconds": 0.27,
             "requests": 1,
             "type": "list",
             "count": 6,
@@ -147,7 +147,7 @@
           },
           "company_list": {
             "ok": true,
-            "seconds": 0.5,
+            "seconds": 0.55,
             "requests": 1,
             "type": "list",
             "count": 652,
@@ -182,7 +182,7 @@
           },
           "security_list": {
             "ok": true,
-            "seconds": 0.5,
+            "seconds": 0.28,
             "requests": 1,
             "type": "list",
             "count": 571,
@@ -197,7 +197,7 @@
           },
           "price_volume_today": {
             "ok": true,
-            "seconds": 0.27,
+            "seconds": 0.3,
             "requests": 1,
             "type": "list",
             "count": 279,
@@ -220,7 +220,7 @@
           },
           "live_market": {
             "ok": true,
-            "seconds": 0.5,
+            "seconds": 0.55,
             "requests": 1,
             "type": "list",
             "count": 352,
@@ -249,7 +249,7 @@
           },
           "top_gainers": {
             "ok": true,
-            "seconds": 0.25,
+            "seconds": 0.27,
             "requests": 1,
             "type": "list",
             "count": 128,
@@ -266,7 +266,7 @@
           },
           "index_intraday_graph": {
             "ok": true,
-            "seconds": 0.5,
+            "seconds": 0.55,
             "requests": 2,
             "type": "list",
             "count": 610,
@@ -276,7 +276,7 @@
           },
           "history_NABIL": {
             "ok": true,
-            "seconds": 0.75,
+            "seconds": 0.56,
             "requests": 2,
             "type": "dict",
             "fields": [
@@ -309,7 +309,7 @@
           },
           "history_ACLBSL": {
             "ok": true,
-            "seconds": 0.26,
+            "seconds": 0.27,
             "requests": 1,
             "type": "dict",
             "fields": [
@@ -342,7 +342,7 @@
           },
           "intraday_ticks_NABIL": {
             "ok": true,
-            "seconds": 0.55,
+            "seconds": 0.28,
             "requests": 1,
             "type": "list",
             "count": 116,
@@ -355,7 +355,7 @@
           },
           "company_details_NABIL": {
             "ok": true,
-            "seconds": 0.27,
+            "seconds": 0.29,
             "requests": 1,
             "type": "dict",
             "fields": [
@@ -376,7 +376,7 @@
           },
           "floorsheet_first_page": {
             "ok": true,
-            "seconds": 0.28,
+            "seconds": 0.68,
             "requests": 1,
             "type": "dict",
             "fields": [
@@ -394,7 +394,7 @@
         },
         "burst_10_calls": {
           "succeeded": 10,
-          "slowest_seconds": 0.25,
+          "slowest_seconds": 0.27,
           "errors": []
         },
         "request_total": 28,
@@ -411,7 +411,7 @@
           "user_agent": "honest",
           "reachable": true,
           "status": 200,
-          "seconds": 0.13,
+          "seconds": 0.24,
           "final_url": "https://raw.githubusercontent.com/Aabishkar2/nepse-data/main/data/company-wise/NABIL.csv",
           "bytes": 222816,
           "content_type": "text/plain; charset=utf-8",
@@ -459,7 +459,7 @@
           "user_agent": "honest",
           "reachable": true,
           "status": 200,
-          "seconds": 0.1,
+          "seconds": 0.21,
           "final_url": "https://raw.githubusercontent.com/Aabishkar2/nepse-data/main/data/company-wise/ACLBSL.csv",
           "bytes": 85872,
           "content_type": "text/plain; charset=utf-8",
@@ -508,7 +508,7 @@
         "user_agent": "honest",
         "reachable": true,
         "status": 200,
-        "seconds": 0.37,
+        "seconds": 0.26,
         "final_url": "https://api.github.com/repos/Aabishkar2/nepse-data/commits?per_page=1",
         "bytes": 3323,
         "content_type": "application/json; charset=utf-8",
@@ -516,7 +516,7 @@
         "last_modified": "Fri, 20 Nov 2026 20:48:07 GMT",
         "rate_headers": {
           "x-ratelimit-limit": "5000",
-          "x-ratelimit-remaining": "4999",
+          "x-ratelimit-remaining": "4998",
           "x-ratelimit-reset": "1795245442"
         },
         "block_signals": [],
@@ -542,7 +542,7 @@
         "user_agent": "honest",
         "reachable": true,
         "status": 200,
-        "seconds": 0.06,
+        "seconds": 0.3,
         "final_url": "https://www.sharesansar.com/robots.txt",
         "bytes": 24,
         "content_type": "text/plain; charset=utf-8",
@@ -557,7 +557,7 @@
         "user_agent": "honest",
         "reachable": true,
         "status": 200,
-        "seconds": 0.72,
+        "seconds": 1.0,
         "final_url": "https://www.sharesansar.com/today-share-price",
         "bytes": 750808,
         "content_type": "text/html; charset=utf-8",
@@ -566,7 +566,7 @@
         "rate_headers": {},
         "block_signals": [],
         "table_rows": 353,
-        "as_of_text": "d-color: #d6eef8; } As of : 2026-11-20 S.No Symbol Conf. Open High Low Close LTP Close - LTP Close - LTP % VWA",
+        "as_of_text": "Search Watch Video As of : 2026-11-20 S.No Symbol Conf. Open High Low Close LTP Close - LTP Close - LTP % VWA",
         "sample_rows": {
           "NABIL": [
             "172",
@@ -619,21 +619,22 @@
         "user_agent": "honest",
         "reachable": true,
         "status": 200,
-        "seconds": 0.97,
+        "seconds": 1.18,
         "final_url": "https://merolagani.com/robots.txt",
         "bytes": 616,
         "content_type": "text/html; charset=utf-8",
         "server": "Microsoft-IIS/10.0",
         "last_modified": null,
         "rate_headers": {},
-        "block_signals": []
+        "block_signals": [],
+        "looks_like_robots_file": false
       },
       "latest_market": {
         "url": "https://merolagani.com/LatestMarket.aspx",
         "user_agent": "honest",
         "reachable": true,
         "status": 200,
-        "seconds": 2.19,
+        "seconds": 3.22,
         "final_url": "https://merolagani.com/LatestMarket.aspx",
         "bytes": 283841,
         "content_type": "text/html; charset=utf-8",
@@ -668,7 +669,7 @@
         "user_agent": "honest",
         "reachable": true,
         "status": 200,
-        "seconds": 0.04,
+        "seconds": 0.06,
         "final_url": "https://nepsealpha.com/robots.txt",
         "bytes": 167,
         "content_type": "text/plain; charset=utf-8",
@@ -683,7 +684,7 @@
         "user_agent": "honest",
         "reachable": true,
         "status": 200,
-        "seconds": 1.28,
+        "seconds": 1.24,
         "final_url": "https://nepsealpha.com/",
         "bytes": 289378,
         "content_type": "text/html; charset=utf-8",
@@ -701,7 +702,7 @@
           "user_agent": "honest",
           "reachable": true,
           "status": 404,
-          "seconds": 0.12,
+          "seconds": 0.13,
           "final_url": "https://shubhamnpk.github.io/yonepse/data/market_status.json",
           "bytes": 9379,
           "content_type": "text/html; charset=utf-8",
@@ -715,7 +716,7 @@
           "user_agent": "honest",
           "reachable": true,
           "status": 200,
-          "seconds": 0.04,
+          "seconds": 0.13,
           "final_url": "https://shubhamnpk.github.io/yonepse/data/nepse_data.json",
           "bytes": 142837,
           "content_type": "application/json; charset=utf-8",
@@ -747,7 +748,7 @@
           "user_agent": "honest",
           "reachable": true,
           "status": 404,
-          "seconds": 0.13,
+          "seconds": 0.12,
           "final_url": "https://shubhamnpk.github.io/yonepse/data/upcoming_ipo.json",
           "bytes": 9379,
           "content_type": "text/html; charset=utf-8",
@@ -759,5 +760,5 @@
       }
     }
   },
-  "duration_seconds": 74.4
+  "duration_seconds": 74.5
 }
