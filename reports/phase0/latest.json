@@ -1,0 +1,763 @@
+{
+  "run_at_utc": "2026-11-21 06:16:30",
+  "run_at_npt": "2026-11-21 12:01 NPT (Saturday)",
+  "trigger": "push",
+  "runner": {
+    "github_runner": "GitHub Actions 1000000000",
+    "runner_os": "Linux",
+    "ip": "145.132.99.104",
+    "city": "Boydton",
+    "region": "Virginia",
+    "country": "US",
+    "org": "AS8075 Microsoft Corporation"
+  },
+  "sources": {
+    "nepalstock": {
+      "source": "nepalstock.com (NEPSE website API via unofficial `nepse` library)",
+      "tls": {
+        "host": "www.nepalstock.com",
+        "resolved_ips": [
+          "110.44.116.20"
+        ],
+        "verified": true,
+        "protocol": "TLSv1.2",
+        "issuer": "US / DigiCert Inc / www.digicert.com / GeoTrust TLS RSA CA G1",
+        "expires": "Dec 10 23:59:59 2026 GMT"
+      },
+      "tls_alt_domain": {
+        "host": "nepalstock.com.np",
+        "resolved_ips": [
+          "182.93.68.4"
+        ],
+        "verified": true,
+        "protocol": "TLSv1.2",
+        "issuer": "US / DigiCert Inc / www.digicert.com / GeoTrust TLS RSA CA G1",
+        "expires": "Dec 10 23:59:59 2026 GMT"
+      },
+      "homepage": {
+        "url": "https://www.nepalstock.com/",
+        "user_agent": "honest",
+        "reachable": true,
+        "status": 200,
+        "seconds": 1.5,
+        "final_url": "https://www.nepalstock.com/",
+        "bytes": 2830,
+        "content_type": "text/html",
+        "server": "nepse-website",
+        "last_modified": "Thu, 24 Sep 2026 11:48:44 GMT",
+        "rate_headers": {},
+        "block_signals": []
+      },
+      "robots": {
+        "url": "https://www.nepalstock.com/robots.txt",
+        "user_agent": "honest",
+        "reachable": true,
+        "status": 200,
+        "seconds": 1.53,
+        "final_url": "https://www.nepalstock.com/robots.txt",
+        "bytes": 2830,
+        "content_type": "text/html",
+        "server": "nepse-website",
+        "last_modified": "Thu, 24 Sep 2026 11:48:44 GMT",
+        "rate_headers": {},
+        "block_signals": [],
+        "looks_like_robots_file": false,
+        "text": null
+      },
+      "without_token": {
+        "url": "https://www.nepalstock.com/api/nots/nepse-data/market-open",
+        "user_agent": "browser",
+        "reachable": true,
+        "status": 401,
+        "seconds": 1.53,
+        "final_url": "https://www.nepalstock.com/api/nots/nepse-data/market-open",
+        "bytes": 87,
+        "content_type": "text/html;charset=UTF-8",
+        "server": "nepse-website",
+        "last_modified": null,
+        "rate_headers": {},
+        "block_signals": [],
+        "body_start": "<html><head><title>Error</title></head><body>WARNING: UNAUTHORIZED ACCESS</body></html>"
+      },
+      "library": {
+        "tls_verification_used": true,
+        "calls": {
+          "market_status": {
+            "ok": true,
+            "seconds": 1.46,
+            "requests": 2,
+            "type": "dict",
+            "fields": [
+              "asOf",
+              "id",
+              "isOpen"
+            ],
+            "sample": "{\"isOpen\": \"CLOSE\", \"asOf\": \"2026-11-20T15:00:00\", \"id\": 80}"
+          },
+          "nepse_index": {
+            "ok": true,
+            "seconds": 0.25,
+            "requests": 1,
+            "type": "list",
+            "count": 4,
+            "fields": [
+              "auditId",
+              "change",
+              "close",
+              "currentValue",
+              "exchangeIndexId",
+              "fiftyTwoWeekHigh",
+              "fiftyTwoWeekLow",
+              "generatedTime",
+              "high",
+              "id",
+              "index",
+              "low",
+              "perChange",
+              "previousClose"
+            ],
+            "sample": "{\"id\": 57, \"auditId\": null, \"exchangeIndexId\": null, \"generatedTime\": \"2026-11-20T15:16:44.063\", \"index\": \"Sensitive Index\", \"close\": 476.94, \"high\": 478.7277, \"low\": 475.806, \"previousClose\": 477.016, \"change\": 0.07, \"perChange\": 0.01, \"fiftyTwoWeekHigh\": 507.0, \"fiftyTwoWeekLow\": 440.65, \"currentValue\": 477.01}"
+          },
+          "sub_indices": {
+            "ok": true,
+            "seconds": 0.25,
+            "requests": 1,
+            "type": "list",
+            "count": 13,
+            "fields": [
+              "change",
+              "currentValue",
+              "id",
+              "index",
+              "perChange"
+            ],
+            "sample": "{\"id\": 64, \"index\": \"Microfinance Index\", \"change\": -10.58, \"perChange\": -0.23, \"currentValue\": 4413.88}"
+          },
+          "market_summary": {
+            "ok": true,
+            "seconds": 0.25,
+            "requests": 1,
+            "type": "list",
+            "count": 6,
+            "fields": [
+              "detail",
+              "value"
+            ],
+            "sample": "{\"detail\": \"Total Turnover Rs:\", \"value\": 3887563470.82}"
+          },
+          "company_list": {
+            "ok": true,
+            "seconds": 0.5,
+            "requests": 1,
+            "type": "list",
+            "count": 652,
+            "fields": [
+              "companyEmail",
+              "companyName",
+              "id",
+              "instrumentType",
+              "regulatoryBody",
+              "sectorName",
+              "securityName",
+              "status",
+              "symbol",
+              "website"
+            ],
+            "sample": "{\"id\": 131, \"companyName\": \"Nabil Bank Limited\", \"symbol\": \"NABIL\", \"securityName\": \"Nabil Bank Limited\", \"status\": \"A\", \"companyEmail\": \"company.affairs@nabilbank.com\", \"website\": \"www.nabilbank.com\", \"sectorName\": \"Commercial Banks\", \"regulatoryBody\": \"Nepal Rastra Bank\", \"instrumentType\": \"Equity\"}",
+            "sectors": [
+              "Commercial Banks",
+              "Development Banks",
+              "Finance",
+              "Hotels And Tourism",
+              "Hydro Power",
+              "Investment",
+              "Life Insurance",
+              "Manufacturing And Processing",
+              "Microfinance",
+              "Mutual Fund",
+              "Non Life Insurance",
+              "Others",
+              "Tradings"
+            ]
+          },
+          "security_list": {
+            "ok": true,
+            "seconds": 0.5,
+            "requests": 1,
+            "type": "list",
+            "count": 571,
+            "fields": [
+              "activeStatus",
+              "id",
+              "name",
+              "securityName",
+              "symbol"
+            ],
+            "sample": "{\"id\": 9192, \"symbol\": \"USHL\", \"securityName\": \"Upper Syange Hydropower Limited\", \"name\": \"(USHL) Upper Syange Hydropower Limited\", \"activeStatus\": \"A\"}"
+          },
+          "price_volume_today": {
+            "ok": true,
+            "seconds": 0.27,
+            "requests": 1,
+            "type": "list",
+            "count": 279,
+            "fields": [
+              "closePrice",
+              "indexId",
+              "lastTradedPrice",
+              "percentageChange",
+              "previousClose",
+              "securityId",
+              "securityName",
+              "symbol",
+              "totalTradeQuantity"
+            ],
+            "sample": "{\"securityId\": \"2790\", \"securityName\": \"Aarambha Chautari Laghubitta Bittiya Sanstha Limited\", \"symbol\": \"ACLBSL\", \"indexId\": 58, \"totalTradeQuantity\": 399, \"lastTradedPrice\": 773.3, \"percentageChange\": 1.08496732, \"previousClose\": 765.0, \"closePrice\": 773.3}",
+            "sample_rows": {
+              "NABIL": "{\"securityId\": \"131\", \"securityName\": \"Nabil Bank Limited\", \"symbol\": \"NABIL\", \"indexId\": 58, \"totalTradeQuantity\": 40217, \"lastTradedPrice\": 550.0, \"percentageChange\": -0.181488203, \"previousClose\": 551.0, \"closePrice\": 550.0}",
+              "ACLBSL": "{\"securityId\": \"2790\", \"securityName\": \"Aarambha Chautari Laghubitta Bittiya Sanstha Limited\", \"symbol\": \"ACLBSL\", \"indexId\": 58, \"totalTradeQuantity\": 399, \"lastTradedPrice\": 773.3, \"percentageChange\": 1.08496732, \"previousClose\": 765.0, \"closePrice\": 773.3}"
+            }
+          },
+          "live_market": {
+            "ok": true,
+            "seconds": 0.5,
+            "requests": 1,
+            "type": "list",
+            "count": 352,
+            "fields": [
+              "averageTradedPrice",
+              "highPrice",
+              "indexId",
+              "lastTradedPrice",
+              "lastTradedVolume",
+              "lastUpdatedDateTime",
+              "lowPrice",
+              "openPrice",
+              "percentageChange",
+              "previousClose",
+              "securityId",
+              "securityName",
+              "symbol",
+              "totalTradeQuantity",
+              "totalTradeValue"
+            ],
+            "sample": "{\"securityId\": \"178\", \"securityName\": \"National Life Insurance Co. Ltd.\", \"symbol\": \"NLICL\", \"indexId\": 58, \"openPrice\": 565.0, \"highPrice\": 568.0, \"lowPrice\": 563.0, \"totalTradeQuantity\": 9603, \"totalTradeValue\": 5432008.4, \"lastTradedPrice\": 563.0, \"percentageChange\": -1.21, \"lastUpdatedDateTime\": \"2026-11-20 14:59:59.968499\", \"lastTradedVolume\": 80, \"previousClose\": 569.9, \"averageTradedPrice\": 565.66}",
+            "sample_rows": {
+              "NABIL": "{\"securityId\": \"131\", \"securityName\": \"Nabil Bank Limited\", \"symbol\": \"NABIL\", \"indexId\": 58, \"openPrice\": 551.0, \"highPrice\": 554.0, \"lowPrice\": 548.5, \"totalTradeQuantity\": 40217, \"totalTradeValue\": 22113497.8, \"lastTradedPrice\": 550.0, \"percentageChange\": -0.18, \"lastUpdatedDateTime\": \"2026-11-20 14:59:36.726719\", \"lastTradedVolume\": 5, \"previousClose\": 551.0, \"averageTradedPrice\": 549.85}",
+              "ACLBSL": "{\"securityId\": \"2790\", \"securityName\": \"Aarambha Chautari Laghubitta Bittiya Sanstha Limited\", \"symbol\": \"ACLBSL\", \"indexId\": 58, \"openPrice\": 765.0, \"highPrice\": 773.3, \"lowPrice\": 765.0, \"totalTradeQuantity\": 399, \"totalTradeValue\": 307573.6, \"lastTradedPrice\": 773.3, \"percentageChange\": 1.08, \"lastUpdatedDateTime\": \"2026-11-20 14:54:59.364367\", \"lastTradedVolume\": 60, \"previousClose\": 765.0, \"averageTradedPrice\": 770.86}"
+            }
+          },
+          "top_gainers": {
+            "ok": true,
+            "seconds": 0.25,
+            "requests": 1,
+            "type": "list",
+            "count": 128,
+            "fields": [
+              "cp",
+              "ltp",
+              "percentageChange",
+              "pointChange",
+              "securityId",
+              "securityName",
+              "symbol"
+            ],
+            "sample": "{\"symbol\": \"DOLTI\", \"ltp\": 327.0, \"cp\": 327.0, \"pointChange\": 16.0, \"percentageChange\": 5.14, \"securityName\": \"Dolti Power Company Limited\", \"securityId\": 9170}"
+          },
+          "index_intraday_graph": {
+            "ok": true,
+            "seconds": 0.5,
+            "requests": 2,
+            "type": "list",
+            "count": 610,
+            "sample": "[1795151100, 2629.01]",
+            "first_point": "[1795151100, 2629.01]",
+            "last_point": "[1795166040, 2622.07]"
+          },
+          "history_NABIL": {
+            "ok": true,
+            "seconds": 0.75,
+            "requests": 2,
+            "type": "dict",
+            "fields": [
+              "content",
+              "empty",
+              "first",
+              "last",
+              "number",
+              "numberOfElements",
+              "pageable",
+              "size",
+              "sort",
+              "totalElements",
+              "totalPages"
+            ],
+            "sample": "{\"content\": [{\"businessDate\": \"2026-11-20\", \"totalTrades\": 286, \"totalTradedQuantity\": 40217, \"totalTradedValue\": 22113497.8, \"highPrice\": 554.0, \"lowPrice\": 548.5, \"closePrice\": 550.0}, {\"businessDate\": \"2026-11-19\", \"totalTrades\": 253, \"totalTradedQuantity\": 30990, \"totalTradedValue\": 17096287.5, \"highPrice\": 552.5, \"lowPrice\": 550.0, \"closePrice\": 551.0}, {\"businessDate\": \"2026-11-18\", \"totalTrades\": 320, \"totalTradedQuantity\": 41735, \"totalTradedValue\": 22957452.1, \"highPrice\": 552.9, \"lowPrice\": 549.0, \"closePrice\": 550.0}, {\"businessDate\": \"2026-11-17\", \"totalTrades\": 358, \"totalTradedQuantity\": 47671, \"totalTradedValue\": 26149681.5, \"highPrice\": 550.0, \"lowPrice\": 545.0, \"closePrice\": ...[truncated]",
+            "date_range_first_page": {
+              "field": "businessDate",
+              "earliest": "2025-11-20",
+              "latest": "2026-11-20",
+              "rows": 229
+            },
+            "paging": {
+              "totalElements": 229,
+              "totalPages": 1,
+              "size": 500,
+              "number": 0,
+              "last": true
+            }
+          },
+          "history_ACLBSL": {
+            "ok": true,
+            "seconds": 0.26,
+            "requests": 1,
+            "type": "dict",
+            "fields": [
+              "content",
+              "empty",
+              "first",
+              "last",
+              "number",
+              "numberOfElements",
+              "pageable",
+              "size",
+              "sort",
+              "totalElements",
+              "totalPages"
+            ],
+            "sample": "{\"content\": [{\"businessDate\": \"2026-11-20\", \"totalTrades\": 18, \"totalTradedQuantity\": 399, \"totalTradedValue\": 307573.6, \"highPrice\": 773.3, \"lowPrice\": 765.0, \"closePrice\": 773.3}, {\"businessDate\": \"2026-11-19\", \"totalTrades\": 37, \"totalTradedQuantity\": 1328, \"totalTradedValue\": 1004957.6, \"highPrice\": 782.0, \"lowPrice\": 742.0, \"closePrice\": 765.0}, {\"businessDate\": \"2026-11-18\", \"totalTrades\": 54, \"totalTradedQuantity\": 1978, \"totalTradedValue\": 1525656.2, \"highPrice\": 776.5, \"lowPrice\": 762.0, \"closePrice\": 764.0}, {\"businessDate\": \"2026-11-17\", \"totalTrades\": 38, \"totalTradedQuantity\": 2205, \"totalTradedValue\": 1745279.9, \"highPrice\": 813.0, \"lowPrice\": 786.0, \"closePrice\": 798.0}, {\"bus ...[truncated]",
+            "date_range_first_page": {
+              "field": "businessDate",
+              "earliest": "2025-11-20",
+              "latest": "2026-11-20",
+              "rows": 229
+            },
+            "paging": {
+              "totalElements": 229,
+              "totalPages": 1,
+              "size": 500,
+              "number": 0,
+              "last": true
+            }
+          },
+          "intraday_ticks_NABIL": {
+            "ok": true,
+            "seconds": 0.55,
+            "requests": 1,
+            "type": "list",
+            "count": 116,
+            "fields": [
+              "contractQuantity",
+              "contractRate",
+              "time"
+            ],
+            "sample": "{\"contractQuantity\": null, \"contractRate\": 551.0, \"time\": 1795150860}"
+          },
+          "company_details_NABIL": {
+            "ok": true,
+            "seconds": 0.27,
+            "requests": 1,
+            "type": "dict",
+            "fields": [
+              "issuedCapital",
+              "marketCapitalization",
+              "paidUpCapital",
+              "promoterPercentage",
+              "promoterShares",
+              "publicPercentage",
+              "publicShares",
+              "security",
+              "securityDailyTradeDto",
+              "securityId",
+              "stockListedShares",
+              "updatedDate"
+            ],
+            "sample": "{\"securityDailyTradeDto\": {\"securityId\": \"131\", \"openPrice\": 551.0, \"highPrice\": 554.0, \"lowPrice\": 548.5, \"totalTradeQuantity\": 40217, \"totalTrades\": 286, \"lastTradedPrice\": 550.0, \"previousClose\": 551.0, \"businessDate\": \"2026-11-20\", \"closePrice\": 550.0, \"fiftyTwoWeekHigh\": 581.0, \"fiftyTwoWeekLow\": 485.0, \"lastUpdatedDateTime\": \"2026-11-20T14:59:36.726719\"}, \"security\": {\"id\": 131, \"symbol\": \"NABIL\", \"isin\": \"NPE025A00004\", \"permittedToTrade\": \"Y\", \"listingDate\": \"1985-11-24\", \"creditRating\": null, \"tickSize\": 0.1, \"instrumentType\": {\"id\": 1, \"code\": \"EQ\", \"description\": \"Equity\", \"activeStatus\": \"A\"}, \"capitalGainBaseDate\": \"2006-12-29\", \"faceValue\": 100.0, \"highRangeDPR\": null, \"issuerN ...[truncated]"
+          },
+          "floorsheet_first_page": {
+            "ok": true,
+            "seconds": 0.28,
+            "requests": 1,
+            "type": "dict",
+            "fields": [
+              "floorsheets",
+              "totalAmount",
+              "totalQty",
+              "totalTrades"
+            ],
+            "sample": "{\"totalAmount\": 3887563470.82, \"totalQty\": 10602468, \"floorsheets\": {\"content\": [{\"contractId\": 2026112003009884, \"stockSymbol\": \"NLICL\", \"buyerMemberId\": \"45\", \"sellerMemberId\": \"34\", \"contractQuantity\": 80, \"contractRate\": 563.0, \"contractAmount\": 45040.0, \"businessDate\": \"2026-11-20\", \"tradeBookId\": 202490574, \"stockId\": 178, \"buyerBrokerName\": \"Imperial Securities Company Pvt. Ltd.\", \"sellerBrokerName\": \"Vision Securities Pvt. Ltd\", \"tradeTime\": \"2026-11-20T14:59:59.968499\", \"securityName\": \"National Life Insurance Co. Ltd.\"}, {\"contractId\": 2026112003009883, \"stockSymbol\": \"PMLI\", \"buyerMemberId\": \"5\", \"sellerMemberId\": \"58\", \"contractQuantity\": 100, \"contractRate\": 370.0, \"contractAmou ...[truncated]",
+            "paging": {
+              "totalElements": 39966,
+              "totalPages": 1999
+            }
+          }
+        },
+        "burst_10_calls": {
+          "succeeded": 10,
+          "slowest_seconds": 0.25,
+          "errors": []
+        },
+        "request_total": 28,
+        "http_statuses": {
+          "200": 28
+        }
+      }
+    },
+    "github_dataset": {
+      "source": "github.com/Aabishkar2/nepse-data (daily CSV per company)",
+      "files": {
+        "NABIL": {
+          "url": "https://raw.githubusercontent.com/Aabishkar2/nepse-data/main/data/company-wise/NABIL.csv",
+          "user_agent": "honest",
+          "reachable": true,
+          "status": 200,
+          "seconds": 0.13,
+          "final_url": "https://raw.githubusercontent.com/Aabishkar2/nepse-data/main/data/company-wise/NABIL.csv",
+          "bytes": 222816,
+          "content_type": "text/plain; charset=utf-8",
+          "server": null,
+          "last_modified": null,
+          "rate_headers": {},
+          "block_signals": [],
+          "columns": [
+            "published_date",
+            "open",
+            "high",
+            "low",
+            "close",
+            "per_change",
+            "traded_quantity",
+            "traded_amount",
+            "status"
+          ],
+          "rows": 3544,
+          "first_row": {
+            "published_date": "2011-05-15",
+            "open": "1091.0",
+            "high": "1155.0",
+            "low": "1112.0",
+            "close": "1155.0",
+            "per_change": "nan",
+            "traded_quantity": "38.0",
+            "traded_amount": "43057.0",
+            "status": "0"
+          },
+          "last_row": {
+            "published_date": "2026-11-20",
+            "open": "551.0",
+            "high": "554.0",
+            "low": "548.5",
+            "close": "550.0",
+            "per_change": "-0.18",
+            "traded_quantity": "40217.0",
+            "traded_amount": "22113497.8",
+            "status": "-1"
+          }
+        },
+        "ACLBSL": {
+          "url": "https://raw.githubusercontent.com/Aabishkar2/nepse-data/main/data/company-wise/ACLBSL.csv",
+          "user_agent": "honest",
+          "reachable": true,
+          "status": 200,
+          "seconds": 0.1,
+          "final_url": "https://raw.githubusercontent.com/Aabishkar2/nepse-data/main/data/company-wise/ACLBSL.csv",
+          "bytes": 85872,
+          "content_type": "text/plain; charset=utf-8",
+          "server": null,
+          "last_modified": null,
+          "rate_headers": {},
+          "block_signals": [],
+          "columns": [
+            "published_date",
+            "open",
+            "high",
+            "low",
+            "close",
+            "per_change",
+            "traded_quantity",
+            "traded_amount",
+            "status"
+          ],
+          "rows": 1398,
+          "first_row": {
+            "published_date": "2020-07-29",
+            "open": "450.0",
+            "high": "492.0",
+            "low": "450.0",
+            "close": "492.0",
+            "per_change": "9.8",
+            "traded_quantity": "80.0",
+            "traded_amount": "38160.0",
+            "status": "1"
+          },
+          "last_row": {
+            "published_date": "2026-11-20",
+            "open": "765.0",
+            "high": "773.3",
+            "low": "765.0",
+            "close": "773.3",
+            "per_change": "1.08",
+            "traded_quantity": "399.0",
+            "traded_amount": "307573.6",
+            "status": "1"
+          }
+        }
+      },
+      "last_commit": {
+        "url": "https://api.github.com/repos/Aabishkar2/nepse-data/commits?per_page=1",
+        "user_agent": "honest",
+        "reachable": true,
+        "status": 200,
+        "seconds": 0.37,
+        "final_url": "https://api.github.com/repos/Aabishkar2/nepse-data/commits?per_page=1",
+        "bytes": 3323,
+        "content_type": "application/json; charset=utf-8",
+        "server": "github.com",
+        "last_modified": "Fri, 20 Nov 2026 20:48:07 GMT",
+        "rate_headers": {
+          "x-ratelimit-limit": "5000",
+          "x-ratelimit-remaining": "4999",
+          "x-ratelimit-reset": "1795245442"
+        },
+        "block_signals": [],
+        "date": "2026-11-20T20:48:07Z"
+      }
+    },
+    "sharesansar": {
+      "source": "sharesansar.com (public HTML pages)",
+      "tls": {
+        "host": "www.sharesansar.com",
+        "resolved_ips": [
+          "184.197.16.73",
+          "3.233.25.217",
+          "32.195.153.124"
+        ],
+        "verified": true,
+        "protocol": "TLSv1.2",
+        "issuer": "US / Amazon / Amazon RSA 2048 M01",
+        "expires": "Mar  7 23:59:59 2027 GMT"
+      },
+      "robots": {
+        "url": "https://www.sharesansar.com/robots.txt",
+        "user_agent": "honest",
+        "reachable": true,
+        "status": 200,
+        "seconds": 0.06,
+        "final_url": "https://www.sharesansar.com/robots.txt",
+        "bytes": 24,
+        "content_type": "text/plain; charset=utf-8",
+        "server": "Apache/2.4.58 (Ubuntu)",
+        "last_modified": "Fri, 20 Dec 2024 09:55:28 GMT",
+        "rate_headers": {},
+        "block_signals": [],
+        "text": "User-agent: *\nDisallow:\n"
+      },
+      "today_share_price": {
+        "url": "https://www.sharesansar.com/today-share-price",
+        "user_agent": "honest",
+        "reachable": true,
+        "status": 200,
+        "seconds": 0.72,
+        "final_url": "https://www.sharesansar.com/today-share-price",
+        "bytes": 750808,
+        "content_type": "text/html; charset=utf-8",
+        "server": "Apache/2.4.58 (Ubuntu)",
+        "last_modified": null,
+        "rate_headers": {},
+        "block_signals": [],
+        "table_rows": 353,
+        "as_of_text": "d-color: #d6eef8; } As of : 2026-11-20 S.No Symbol Conf. Open High Low Close LTP Close - LTP Close - LTP % VWA",
+        "sample_rows": {
+          "NABIL": [
+            "172",
+            "NABIL",
+            "34.13",
+            "551.00",
+            "554.00",
+            "548.50",
+            "550.00",
+            "550.00",
+            "0.00",
+            "0.00",
+            "549.85",
+            "40,217.00"
+          ],
+          "ACLBSL": [
+            "1",
+            "ACLBSL",
+            "26.13",
+            "765.00",
+            "773.30",
+            "765.00",
+            "773.30",
+            "773.30",
+            "0.00",
+            "0.00",
+            "770.86",
+            "399.00"
+          ]
+        },
+        "form_actions": [],
+        "ajax_urls": []
+      }
+    },
+    "merolagani": {
+      "source": "merolagani.com (public HTML pages)",
+      "policy_note": "Terms of use prohibit scripts, scraping and data mining. Reachability check only; not to be used for ingestion.",
+      "tls": {
+        "host": "merolagani.com",
+        "resolved_ips": [
+          "103.250.132.224"
+        ],
+        "verified": true,
+        "protocol": "TLSv1.2",
+        "issuer": "US / Let's Encrypt / YR2",
+        "expires": "Dec 14 06:10:41 2026 GMT"
+      },
+      "robots": {
+        "url": "https://merolagani.com/robots.txt",
+        "user_agent": "honest",
+        "reachable": true,
+        "status": 200,
+        "seconds": 0.97,
+        "final_url": "https://merolagani.com/robots.txt",
+        "bytes": 616,
+        "content_type": "text/html; charset=utf-8",
+        "server": "Microsoft-IIS/10.0",
+        "last_modified": null,
+        "rate_headers": {},
+        "block_signals": []
+      },
+      "latest_market": {
+        "url": "https://merolagani.com/LatestMarket.aspx",
+        "user_agent": "honest",
+        "reachable": true,
+        "status": 200,
+        "seconds": 2.19,
+        "final_url": "https://merolagani.com/LatestMarket.aspx",
+        "bytes": 283841,
+        "content_type": "text/html; charset=utf-8",
+        "server": "Microsoft-IIS/10.0",
+        "last_modified": null,
+        "rate_headers": {},
+        "block_signals": [],
+        "table_rows": 397,
+        "as_of_text": "Losers Live Trading As of 2026/11/20 15:00:00 Go to your Watchlist &rarr; Symbol LTP % Change Open High Low Qt"
+      }
+    },
+    "nepsealpha": {
+      "source": "nepsealpha.com",
+      "policy_note": "robots.txt disallows /api/*, /rest/v1/* and /trading/*. Reachability check only; not to be used for ingestion.",
+      "tls": {
+        "host": "nepsealpha.com",
+        "resolved_ips": [
+          "104.26.4.244",
+          "104.26.5.244",
+          "172.67.70.238",
+          "2606:4700:20::681a:4f4",
+          "2606:4700:20::681a:5f4",
+          "2606:4700:20::ac43:46ee"
+        ],
+        "verified": true,
+        "protocol": "TLSv1.3",
+        "issuer": "US / Google Trust Services / WE1",
+        "expires": "Jan 14 13:55:10 2027 GMT"
+      },
+      "robots": {
+        "url": "https://nepsealpha.com/robots.txt",
+        "user_agent": "honest",
+        "reachable": true,
+        "status": 200,
+        "seconds": 0.04,
+        "final_url": "https://nepsealpha.com/robots.txt",
+        "bytes": 167,
+        "content_type": "text/plain; charset=utf-8",
+        "server": "cloudflare",
+        "last_modified": "Fri, 13 Sep 2024 11:26:07 GMT",
+        "rate_headers": {},
+        "block_signals": [],
+        "text": "User-agent: *\nDisallow: /admin/*\nDisallow: /api/*\nDisallow: /trading/1/*\nDisallow: /trading/0/*\nDisallow: /force-url-key\nDisallow: /trading-menu/*\nDisallow: /rest/v1/*"
+      },
+      "homepage": {
+        "url": "https://nepsealpha.com/",
+        "user_agent": "honest",
+        "reachable": true,
+        "status": 200,
+        "seconds": 1.28,
+        "final_url": "https://nepsealpha.com/",
+        "bytes": 289378,
+        "content_type": "text/html; charset=utf-8",
+        "server": "cloudflare",
+        "last_modified": null,
+        "rate_headers": {},
+        "block_signals": []
+      }
+    },
+    "yonepse": {
+      "source": "shubhamnpk.github.io/yonepse (static JSON on GitHub Pages)",
+      "files": {
+        "/data/market_status.json": {
+          "url": "https://shubhamnpk.github.io/yonepse/data/market_status.json",
+          "user_agent": "honest",
+          "reachable": true,
+          "status": 404,
+          "seconds": 0.12,
+          "final_url": "https://shubhamnpk.github.io/yonepse/data/market_status.json",
+          "bytes": 9379,
+          "content_type": "text/html; charset=utf-8",
+          "server": "GitHub.com",
+          "last_modified": null,
+          "rate_headers": {},
+          "block_signals": []
+        },
+        "/data/nepse_data.json": {
+          "url": "https://shubhamnpk.github.io/yonepse/data/nepse_data.json",
+          "user_agent": "honest",
+          "reachable": true,
+          "status": 200,
+          "seconds": 0.04,
+          "final_url": "https://shubhamnpk.github.io/yonepse/data/nepse_data.json",
+          "bytes": 142837,
+          "content_type": "application/json; charset=utf-8",
+          "server": "GitHub.com",
+          "last_modified": "Tue, 10 Nov 2026 07:21:36 GMT",
+          "rate_headers": {},
+          "block_signals": [],
+          "type": "list",
+          "count": 350,
+          "fields": [
+            "change",
+            "high",
+            "last_updated",
+            "low",
+            "ltp",
+            "market_cap",
+            "name",
+            "percent_change",
+            "previous_close",
+            "symbol",
+            "trades",
+            "turnover",
+            "volume"
+          ],
+          "sample": "{\"symbol\": \"ACLBSL\", \"name\": \"Aarambha Chautari Laghubitta Bittiya Sanstha Limited\", \"ltp\": 817.5, \"previous_close\": 833.2, \"change\": -15.7, \"percent_change\": -1.88, \"high\": 833.2, \"low\": 808.0, \"volume\": 3471, \"turnover\": 2832025.3, \"trades\": 59, \"last_updated\": \"2026-11-06T14:59:56.703856\", \"market_cap\": 3001.4}"
+        },
+        "/data/upcoming_ipo.json": {
+          "url": "https://shubhamnpk.github.io/yonepse/data/upcoming_ipo.json",
+          "user_agent": "honest",
+          "reachable": true,
+          "status": 404,
+          "seconds": 0.13,
+          "final_url": "https://shubhamnpk.github.io/yonepse/data/upcoming_ipo.json",
+          "bytes": 9379,
+          "content_type": "text/html; charset=utf-8",
+          "server": "GitHub.com",
+          "last_modified": null,
+          "rate_headers": {},
+          "block_signals": []
+        }
+      }
+    }
+  },
+  "duration_seconds": 74.4
+}
