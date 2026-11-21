@@ -1,0 +1,68 @@
+name: Phase 0 - data source probe
+
+# Tests every candidate NEPSE data source from GitHub's servers (outside Nepal)
+# and commits the findings to reports/phase0/. Diagnostic only: it writes
+# nothing to Supabase and needs no secrets.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["phase-0/**"]
+    paths:
+      - "scripts/phase0/**"
+      - ".github/workflows/phase0-source-probe.yml"
+  schedule:
+    # NEPSE trades Monday-Friday 11:00-15:00 Nepal time (UTC+05:45).
+    # GitHub cron is UTC and best-effort, so runs may start late.
+    - cron: "35 5 * * 1-5" # 11:20 Nepal time, shortly after open
+    - cron: "5 8 * * 1-5" # 13:50 Nepal time, mid-session
+
+permissions:
+  contents: write # only to commit the report files back to this branch
+
+concurrency:
+  group: phase0-source-probe-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: scripts/phase0/requirements.txt
+
+      - name: Install probe dependencies
+        run: pip install -r scripts/phase0/requirements.txt
+
+      - name: Run the probe
+        env:
+          GITHUB_TOKEN: ${{ github.token }} # read-only use: GitHub API rate limit
+        run: python scripts/phase0/probe_sources.py
+
+      - name: Keep the report as a downloadable artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase0-report
+          path: reports/phase0/
+          retention-days: 30
+
+      - name: Commit the report
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports/phase0
+          if git diff --cached --quiet; then
+            echo "No report changes to commit."
+            exit 0
+          fi
+          git commit -m "Phase 0 probe report $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]"
+          # Another run may have pushed first; replay on top and retry once.
+          git push || (git pull --rebase && git push)
