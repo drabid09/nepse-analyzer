@@ -5,9 +5,9 @@ Evidence: `reports/phase0/latest.json`, `reports/phase0/latest.md`, `reports/pha
 
 ## What was tested
 
-One run of `scripts/phase0/probe_sources.py` on a GitHub-hosted runner:
+Two runs of `scripts/phase0/probe_sources.py` on GitHub-hosted runners, eleven minutes apart, with the same outcome. Figures below are from the first:
 
-- When: Saturday 21 Nov 2026, 12:01 Nepal time. **The market was closed.**
+- When: Saturday 21 Nov 2026, 12:01 and 12:12 Nepal time. **The market was closed.**
 - From: Microsoft Azure, Boydton, United States (IP 145.132.99.104).
 - How: an honest user agent naming this project first, with a browser user agent only as a recorded fallback (it was never needed).
 
@@ -62,7 +62,7 @@ Limits found:
 - No EPS, PE, book value or dividend fields appeared in the calls tested.
 - No corporate-action or IPO calendar endpoints are in the library's list.
 
-Reliability, plainly: one clean run is not a track record. This is an undocumented API behind a deliberately obscured token. It will break whenever NEPSE changes its site, and has before (the library's changelog records an adjustment for a NEPSE change in February 2023). The library is maintained and runs its own check on GitHub Actions four times a day, which is a good sign, not a guarantee.
+Reliability, plainly: two clean runs on a closed-market Saturday are not a track record. This is an undocumented API behind a deliberately obscured token. It will break whenever NEPSE changes its site, and has before (the library's changelog records an adjustment for a NEPSE change in February 2023). The library is maintained and runs its own check on GitHub Actions four times a day, which is a good sign, not a guarantee.
 
 ### 2. Aabishkar2/nepse-data (history backfill)
 
@@ -113,7 +113,7 @@ Not verified: fetching a past date, and the per-company history, dividend and IP
 | Gap | Why | How it gets closed |
 |---|---|---|
 | Behaviour during trading hours: how fresh `live_market` is, whether calls slow down or fail under load | The probe ran on a Saturday | The workflow is scheduled for 11:20 and 13:50 Nepal time, Monday to Friday. Schedules only run from the default branch, so this starts once the branch is merged |
-| Reliability over time | One run only | Each run appends a line to `reports/phase0/history.csv` |
+| Reliability over time | Two runs only, same day | Each run appends a line to `reports/phase0/history.csv` |
 | Real rate limits | Only a 10-call burst was tried, on purpose | Planned load is about 5 calls every 5 minutes; stay there |
 | Fundamentals (EPS, PE, book value), dividends, bonus and right shares, IPO calendar | No verified free source yet | Needs its own small probe before those tables are filled in Phase 2 |
 | Other GitHub runner regions and IPs | One runner | More runs |
