@@ -59,6 +59,12 @@ update cron.job set active = false where jobname like 'timer:%';
 update cron.job set active = true  where jobname like 'timer:%';
 ```
 
-## Verification
+## Verification (23 Nov 2026)
 
-(Filled in after the timer was switched on.)
+- Token `nepse-supabase-timer` created (drabid09/nepse-analyzer only; Actions read and write; expires 22 Nov 2027) and stored by Drabid in Vault as `github_actions_token`. A check that prints only yes/no confirmed one secret with a fine-grained token's shape.
+- Migration applied in the SQL editor (same SHA-256 as the file in `main`): 19 start jobs plus `timer:check` listed in `cron.job`, all active.
+- Test start of `feedback-notify.yml` at 16:08: GitHub answered **204**, run "Feedback #2" started on `main` and passed in 26 s. `timer.check()` then recorded "Started 1 GitHub job on time", and Data health showed **Timer: ok** on the live site.
+- First start made by `pg_cron` itself: `timer:feedback-notify:1` ran at exactly 16:22:00 (10:37 UTC), GitHub answered 204, and "Feedback #3" passed in 32 s.
+- Security checks on production: **35/35 passed**, including the new "public cannot see the timer schema" and "public cannot read Vault", and anon refused for `timer.plan`, `timer.dispatches`, `timer.start()` and `timer.check()`.
+- Tests: 81 Python tests (timetable matches the workflow files; timer functions against stand-ins for Vault and pg_net), and CI passed on PR #10.
+- GitHub's own schedule still had started **0** runs at 16:10 (Feedback was due at 15:52, Watchdog at 16:05), so the Supabase timer is now the clock the jobs actually run on.
