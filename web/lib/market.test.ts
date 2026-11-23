@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { freshness, nepalNow } from "./market.ts";
+import { freshness, nepalNow, statusLine } from "./market.ts";
 
 // Nepal time is UTC+05:45.
 const npt = (date: string, hhmm: string) => new Date(`${date}T${hhmm}:00+05:45`);
@@ -78,3 +78,22 @@ test("last update is the newest heartbeat", () => {
   const f = check([run("eod", FRI, "ok", npt(FRI, "15:20")), run("live", MON, "running", npt(MON, "11:25"))], FRI, [], npt(MON, "11:30"));
   assert.equal(f.lastUpdate, npt(MON, "11:25").toISOString());
 });
+
+test("status line under the greeting", () => {
+  const label = (d: string | null) => `[${d}]`;
+  const line = (live: boolean, priceDate: string, signalDate: string, at: Date) => statusLine({ live, priceDate, signalDate, now: at }, label);
+  assert.match(line(true, MON, FRI, npt(MON, "12:00")), /market is open/);
+  // After 15:00, before the end-of-day job: not "open" any more.
+  assert.match(line(true, MON, FRI, npt(MON, "15:10")), /Trading has ended for today/);
+  // End of day done, calls not yet.
+  assert.match(line(false, MON, FRI, npt(MON, "15:30")), /today's final prices; new calls arrive/);
+  // Calls done.
+  assert.match(line(false, MON, MON, npt(MON, "16:00")), /today's final prices and today's new calls/);
+  // Trading hours with no live prices (late start or a holiday).
+  assert.equal(line(false, FRI, FRI, npt(MON, "11:30")), "Live prices have not arrived yet today. These are the prices from [2026-11-20].");
+  // Weekend.
+  assert.equal(line(false, FRI, FRI, npt(SAT, "10:00")), "The market is closed. These are the prices from [2026-11-20].");
+  // Yesterday's prices never finalised: say so rather than "open".
+  assert.match(line(true, FRI, FRI, npt(MON, "09:00")), /not confirmed yet/);
+});
+
