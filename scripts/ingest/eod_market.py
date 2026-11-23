@@ -154,6 +154,71 @@ def summarise_floorsheet(trades: list[dict], by_security, by_symbol, trade_date:
     return rows, unmapped
 
 
+# ---------------------------------------------------------------- prices
+
+
+def first_of(row: dict, *keys):
+    for key in keys:
+        if row.get(key) is not None:
+            return row[key]
+    return None
+
+
+def rows_from_live(live: list[dict], closes: list[dict], trade_date: date) -> list[dict]:
+    """Normalise the live market list (the verified source after the close)."""
+    close_by_symbol = {str(r.get("symbol")).upper(): num(r.get("closePrice")) for r in closes if num(r.get("closePrice"))}
+    out = []
+    for r in live:
+        updated = parse_npt(r.get("lastUpdatedDateTime"))
+        if updated and updated.date() != trade_date:
+            continue
+        out.append({
+            "securityId": r.get("securityId"), "symbol": r.get("symbol"),
+            "open": num(r.get("openPrice")), "high": num(r.get("highPrice")), "low": num(r.get("lowPrice")),
+            "close": close_by_symbol.get(str(r.get("symbol")).upper()) or num(r.get("lastTradedPrice")),
+            "prev_close": num(r.get("previousClose")), "volume": whole(r.get("totalTradeQuantity")) or 0,
+            "turnover": num(r.get("totalTradeValue")), "trades": None,
+        })
+    return out
+
+
+def rows_from_today_price(nepse: NepseSource, trade_date: date) -> tuple[list[dict], dict]:
+    """NEPSE's "today's price" list for a business date: the fallback when the
+    live market list has already been cleared (for example on a catch-up run
+    the next morning). Field names are matched loosely; the first row's keys are
+    recorded in the run details so the shape is documented by real data."""
+    api = nepse.api
+    url = f"{api.api_end_points['todays_price']}?&size=500&businessDate={trade_date.isoformat()}"
+    items, number, pages, shape = [], 0, 1, None
+    while number < pages:
+        target = url if number == 0 else f"{url}&page={number}"
+        result = nepse.call("requestPOSTAPI", url=target, payload_generator=api.getPOSTPayloadIDForFloorSheet)
+        content = result.get("content") if isinstance(result, dict) else result
+        if not isinstance(content, list):
+            raise JobError(f"today's price list for {trade_date} had an unexpected shape: {type(result).__name__}")
+        if isinstance(result, dict):
+            pages = whole(result.get("totalPages")) or 1
+        items.extend(content)
+        number += 1
+        clock.sleep(PAUSE)
+    if items:
+        shape = sorted(items[0].keys())
+    out = []
+    for r in items:
+        if str(first_of(r, "businessDate") or trade_date) != trade_date.isoformat():
+            continue
+        out.append({
+            "securityId": first_of(r, "securityId", "stockId"), "symbol": first_of(r, "symbol", "stockSymbol"),
+            "open": num(first_of(r, "openPrice", "open")), "high": num(first_of(r, "highPrice", "high")),
+            "low": num(first_of(r, "lowPrice", "low")), "close": num(first_of(r, "closePrice", "close", "lastTradedPrice")),
+            "prev_close": num(first_of(r, "previousDayClosePrice", "previousClose")),
+            "volume": whole(first_of(r, "totalTradedQuantity", "totalTradeQuantity")) or 0,
+            "turnover": num(first_of(r, "totalTradedValue", "totalTradeValue")),
+            "trades": whole(first_of(r, "totalTrades")),
+        })
+    return out, {"pages": pages, "rows": len(items), "fields": shape}
+
+
 # ---------------------------------------------------------------- price adjustments
 
 
@@ -298,22 +363,28 @@ def main() -> None:
         return
 
     run_log = JobRun(db, "eod", trade_date=trade_date)
+    try:
+        finalise(db, nepse, run_log, trade_date)
+    except JobError as exc:
+        run_log.finish("failed", str(exc), requests=nepse.budget.total)
+        raise
+
+
+def finalise(db: Supabase, nepse: NepseSource, run_log: JobRun, trade_date: date) -> None:
     problems: list[str] = []
     by_security, by_symbol = company_maps(db)
 
-    # 1. Prices
-    live = nepse.call("getLiveMarket")
-    closes = nepse.call("getPriceVolume")
-    if not isinstance(live, list) or not isinstance(closes, list):
-        raise JobError("NEPSE returned an unexpected shape for the live market or price list")
-    newest = max((d for d in (parse_npt(r.get("lastUpdatedDateTime")) for r in live) if d), default=None)
-    if not newest or newest.date() != trade_date:
-        raise JobError(f"NEPSE's live market is dated {newest.date() if newest else 'nothing'}, not {trade_date}; nothing written")
-    close_by_company = {}
-    for r in closes:
-        company_id = lookup_company(r, by_security, by_symbol)
-        if company_id is not None and num(r.get("closePrice")):
-            close_by_company[company_id] = num(r.get("closePrice"))
+    # 1. Prices: the live market list if it still holds trade_date, else today's price list
+    live = nepse.call("getLiveMarket") or []
+    newest = max((d for d in (parse_npt(r.get("lastUpdatedDateTime")) for r in live if isinstance(r, dict)) if d), default=None)
+    price_info: dict = {}
+    if newest and newest.date() == trade_date:
+        source_rows = rows_from_live(live, nepse.call("getPriceVolume") or [], trade_date)
+        price_info["source"] = "live market"
+    else:
+        source_rows, price_info = rows_from_today_price(nepse, trade_date)
+        price_info["source"] = "today's price"
+        price_info["live_market_dated"] = newest.date().isoformat() if newest else None
 
     # 2. Floorsheet (optional: prices are still written if it fails)
     floor_rows, floor_info, trades_by_company = [], {}, {}
@@ -329,18 +400,12 @@ def main() -> None:
 
     prices, volume_mismatch = [], []
     advancers = decliners = unchanged = 0
-    for r in live:
+    for r in source_rows:
         company_id = lookup_company(r, by_security, by_symbol)
-        volume = whole(r.get("totalTradeQuantity")) or 0
-        if company_id is None or volume <= 0:
+        volume, close = r["volume"], r["close"]
+        if company_id is None or volume <= 0 or close is None:
             continue
-        updated = parse_npt(r.get("lastUpdatedDateTime"))
-        if updated and updated.date() != trade_date:
-            continue
-        close = close_by_company.get(company_id) or num(r.get("lastTradedPrice"))
-        if close is None:
-            continue
-        prev = num(r.get("previousClose"))
+        prev = r["prev_close"]
         floor = trades_by_company.get(company_id)
         if floor and floor["quantity"] != volume:
             volume_mismatch.append(company_id)
@@ -350,14 +415,14 @@ def main() -> None:
             unchanged += close == prev
         prices.append({
             "company_id": company_id, "date": trade_date.isoformat(),
-            "open": num(r.get("openPrice")), "high": num(r.get("highPrice")), "low": num(r.get("lowPrice")),
-            "close": close, "prev_close": prev, "volume": volume, "turnover": num(r.get("totalTradeValue")),
-            "trades": floor["trades"] if floor else None, "is_final": True, "source": "nepse",
+            "open": r["open"], "high": r["high"], "low": r["low"],
+            "close": close, "prev_close": prev, "volume": volume, "turnover": r["turnover"],
+            "trades": floor["trades"] if floor else r["trades"], "is_final": True, "source": "nepse",
         })
     if len(prices) < 50:
-        raise JobError(f"only {len(prices)} traded securities for {trade_date}; suspiciously few, nothing written")
+        raise JobError(f"only {len(prices)} traded securities for {trade_date} ({price_info}); suspiciously few, nothing written")
     if volume_mismatch:
-        problems.append(f"volume differs between live market and floorsheet for {len(volume_mismatch)} companies")
+        problems.append(f"volume differs between the price list and the floorsheet for {len(volume_mismatch)} companies")
 
     # 3. Adjustments (before writing today's rows, so "previous close" means the day before)
     events = detect_adjustments(db, prices, trade_date)
@@ -400,7 +465,7 @@ def main() -> None:
 
     confirmed = [e for e in events if e["status"] == "confirmed"]
     details = {
-        "traded_securities": len(prices), "floorsheet": floor_info, "floorsheet_companies": len(floor_rows),
+        "traded_securities": len(prices), "prices": price_info, "floorsheet": floor_info, "floorsheet_companies": len(floor_rows),
         "indices": len(index_days), "index_graph_points": sum(len(p) for p in index_points.values()),
         "adjustments": {"confirmed": len(confirmed), "unconfirmed": len(events) - len(confirmed), "rows_adjusted": adjusted_rows},
         "rows_removed_by_retention": removed, "storage": space, "problems": problems[:10],
@@ -412,7 +477,7 @@ def main() -> None:
     write_summary("\n".join([
         f"## End of day {trade_date}",
         "",
-        f"- **{len(prices)} traded securities** finalised; advancers {advancers}, decliners {decliners}, unchanged {unchanged}.",
+        f"- **{len(prices)} traded securities** finalised from NEPSE's {price_info['source']} list; advancers {advancers}, decliners {decliners}, unchanged {unchanged}.",
         f"- Floorsheet: {floor_info.get('fetched_trades', 0)} trades in {floor_info.get('pages', 0)} pages "
         f"(NEPSE reported {floor_info.get('reported_trades')}), summarised for {len(floor_rows)} companies.",
         f"- Indices: {len(index_days)} final, {details['index_graph_points']} intraday graph points.",
