@@ -1,117 +1,112 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CallBadge, Change, ScoreBar, Trend } from "@/components/ui";
 import { StarButton, useWatchlist } from "@/components/watchlist";
-import {
-  ALL_SECTORS, CALLS, chipCounts, DEFAULTS, filtersToSearch, firstDesc, isDefault, parseFilters, QUERY_MAX,
-  visibleRows, type Filters, type Row, type SortKey,
-} from "@/lib/signals";
-import { companyHref } from "@/lib/symbol";
+import { companyHref } from "@/lib/symbols";
+import { CALLS, DEFAULT_VIEW, readView, viewQuery, type SortKey, type View } from "./view";
 
-export type { Row } from "@/lib/signals";
+export type Row = {
+  symbol: string; name: string; sector: string; close: number | null; change: number | null; call: string; dataOk: boolean;
+  score: number; confidence: string; trend: string | null; rsi: number | null; low: number | null; high: number | null;
+  reliable: boolean; note: string | null;
+};
+
 
 function fmt(n: number | null) {
   return n === null ? "—" : n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-/**
- * Filters live in the address bar (replaceState, so they do not add Back steps). Back from a
- * company page, a refresh and a shared link all restore the same table.
- */
-function useUrlFilters(sectors: readonly string[]) {
-  const [filters, setFilters] = useState<Filters>(DEFAULTS);
-  const restored = useRef(false);
-  // The latest sector list without re-running the effect below: a background refresh brings
-  // new rows (and a new array) every minute, and must not reset what is being typed.
-  const sectorList = useRef(sectors);
-  sectorList.current = sectors;
+export function SignalsTable({ rows }: { rows: Row[] }) {
+  // The filters live in the address (?call=buy&q=bank...), so they survive going to a
+  // company and back, a refresh, and can be shared. The first render uses the defaults
+  // (as the server did), then the address is read once the page is in the browser.
+  const [view, setView] = useState<View>(DEFAULT_VIEW);
+  const [ready, setReady] = useState(false);
+  const watch = useWatchlist();
+  const sectors = useMemo(() => ["All sectors", ...Array.from(new Set(rows.map((r) => r.sector))).sort()], [rows]);
+  const { call, sector, q, sort, mine: onlyMine } = view;
+  const update = (change: Partial<View>) => setView((v) => ({ ...v, ...change }));
+  const setCall = (c: View["call"]) => update({ call: c });
+  const setSector = (s: string) => update({ sector: s });
+  const setQ = (text: string) => update({ q: text });
+  const setOnlyMine = (f: (v: boolean) => boolean) => setView((v) => ({ ...v, mine: f(v.mine) }));
+  const setSort = (f: (s: View["sort"]) => View["sort"]) => setView((v) => ({ ...v, sort: f(v.sort) }));
 
-  // Read the address once mounted (the server renders the default table), and again when
-  // the browser moves between history entries of this page. A layout effect, so the
-  // filtered table is what the first painted frame after hydration shows.
-  useLayoutEffect(() => {
-    const read = () => setFilters(parseFilters(window.location.search, sectorList.current));
-    read();
-    restored.current = true;
-    window.addEventListener("popstate", read);
-    return () => window.removeEventListener("popstate", read);
+  // Read the address once, when the table appears (also after coming back to the page).
+  // Not again when the rows refresh, or a refresh would undo typing still in flight.
+  useEffect(() => {
+    setView(readView(window.location.search, sectors));
+    setReady(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Write it back, debounced so typing in the filter does not rewrite history on every key.
   useEffect(() => {
-    if (!restored.current) return;
-    const id = window.setTimeout(() => {
-      const search = filtersToSearch(filters);
-      if (search !== window.location.search) {
-        window.history.replaceState(null, "", `${window.location.pathname}${search}${window.location.hash}`);
+    if (!ready) return;
+    // Debounced: typing in the filter would otherwise rewrite the address on every key,
+    // and Safari refuses more than 100 address changes in 30 seconds.
+    const id = setTimeout(() => {
+      const query = viewQuery(view);
+      const url = `${window.location.pathname}${query ? `?${query}` : ""}`;
+      if (url === window.location.pathname + window.location.search) return;
+      try {
+        window.history.replaceState(null, "", url); // Next.js keeps its own router state and syncs the address
+      } catch {
+        // address not updated: the filters still work on the page
       }
     }, 250);
-    return () => window.clearTimeout(id);
-  }, [filters]);
+    return () => clearTimeout(id);
+  }, [view, ready]);
 
-  const update = useCallback((change: Partial<Filters>) => setFilters((f) => ({ ...f, ...change })), []);
-  return { filters, update, reset: () => setFilters(DEFAULTS) };
-}
+  const shown = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    const list = rows.filter((r) => (call === "all" || r.call === call) && (sector === "All sectors" || r.sector === sector)
+      && (!term || r.symbol.toLowerCase().includes(term) || r.name.toLowerCase().includes(term))
+      && (!onlyMine || watch.list.includes(r.symbol)));
+    const dir = sort.desc ? -1 : 1;
+    // Missing values last in either direction; ties keep a fixed order by symbol.
+    return list.sort((a, b) => {
+      const x = a[sort.key], y = b[sort.key];
+      if (x === null || y === null) return x === y ? a.symbol.localeCompare(b.symbol) : x === null ? 1 : -1;
+      return (x < y ? -1 : x > y ? 1 : 0) * dir || a.symbol.localeCompare(b.symbol);
+    });
+  }, [rows, call, sector, q, sort, onlyMine, watch.list]);
 
-export function SignalsTable({ rows }: { rows: Row[] }) {
-  const sectors = useMemo(() => [ALL_SECTORS, ...Array.from(new Set(rows.map((r) => r.sector))).sort()], [rows]);
-  const { filters, update, reset } = useUrlFilters(sectors);
-  const watch = useWatchlist();
-  const starred = useMemo(() => new Set(watch.list), [watch.list]);
-  // Typing stays responsive: the table catches up with the search box a moment later.
-  const q = useDeferredValue(filters.q);
-  const applied = useMemo(() => ({ ...filters, q }), [filters, q]);
-  const shown = useMemo(() => visibleRows(rows, applied, starred), [rows, applied, starred]);
-  const counts = useMemo(() => chipCounts(rows, applied, starred), [rows, applied, starred]);
-
-  const sortBy = (key: SortKey) =>
-    update({ sort: key, desc: filters.sort === key ? !filters.desc : firstDesc(key) });
-
-  const head = (key: SortKey, label: string, cls = "") => {
-    const active = filters.sort === key;
-    return (
-      <th className={`px-2 py-2 font-normal ${cls}`} aria-sort={active ? (filters.desc ? "descending" : "ascending") : "none"}>
-        <button type="button" onClick={() => sortBy(key)} className="select-none hover:text-ink focus-visible:outline-2 focus-visible:outline-accent rounded">
-          {label}<span aria-hidden className="inline-block w-3 text-left">{active ? (filters.desc ? "↓" : "↑") : ""}</span>
-        </button>
-      </th>
-    );
-  };
+  const head = (key: SortKey, label: string, cls = "") => (
+    <th className={`px-2 py-2 font-normal ${cls}`} aria-sort={sort.key === key ? (sort.desc ? "descending" : "ascending") : undefined}>
+      <button type="button" className="select-none hover:text-ink"
+        onClick={() => setSort((s) => ({ key, desc: s.key === key ? !s.desc : key !== "symbol" }))}>
+        {label}{sort.key === key ? (sort.desc ? " ↓" : " ↑") : ""}
+      </button>
+    </th>
+  );
 
   return (
     <div className="rounded-[22px] bg-card border border-line p-4 sm:p-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between mb-4">
-        <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Filter by call">
+        <div className="flex flex-wrap gap-1">
           {CALLS.map((k) => (
-            <button key={k} type="button" onClick={() => update({ call: k })} aria-pressed={filters.call === k}
-              className={`rounded-full px-3 py-1.5 text-[13px] capitalize ${filters.call === k ? "bg-ink text-bg" : "bg-soft text-muted hover:text-ink"}`}>
-              {k === "avoid" ? "No call" : k} <span className="num">{counts[k]}</span>
+            <button key={k} type="button" onClick={() => setCall(k)} aria-pressed={call === k}
+              className={`rounded-full px-3 py-1.5 text-[13px] capitalize ${call === k ? "bg-ink text-bg" : "bg-soft text-muted hover:text-ink"}`}>
+              {k === "avoid" ? "No call" : k} <span className="num">{k === "all" ? rows.length : rows.filter((r) => r.call === k).length}</span>
             </button>
           ))}
-          {/* Not one of the call tabs: it narrows whichever call is chosen. Rendered on the server
-              too (disabled until the browser's stars are known), so the row never shifts. */}
-          <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-          <button type="button" onClick={() => update({ mine: !filters.mine })} aria-pressed={filters.mine} disabled={!watch.mounted}
-            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] disabled:opacity-60 ${filters.mine ? "bg-warn-soft text-warn" : "bg-soft text-muted hover:text-ink"}`}>
-            <svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17.2l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" fill={filters.mine ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" /></svg>
-            Only your stocks <span className="num">{watch.mounted ? counts.mine : "–"}</span>
-          </button>
+          {watch.mounted ? (
+            <button type="button" onClick={() => setOnlyMine((v) => !v)} aria-pressed={onlyMine}
+              className={`rounded-full px-3 py-1.5 text-[13px] ${onlyMine ? "bg-warn-soft text-warn" : "bg-soft text-muted hover:text-ink"}`}>
+              Your stocks <span className="num">{watch.list.filter((s) => rows.some((r) => r.symbol === s)).length}</span>
+            </button>
+          ) : null}
         </div>
         <div className="flex gap-2 min-w-0">
-          <select value={filters.sector} onChange={(e) => update({ sector: e.target.value })} aria-label="Sector"
-            className="min-w-0 max-w-[50%] rounded-full bg-soft px-3 py-1.5 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
-            {sectors.map((s) => <option key={s} value={s}>{s}</option>)}
+          <select value={sector} onChange={(e) => setSector(e.target.value)} aria-label="Sector"
+            className="min-w-0 max-w-[50%] rounded-full bg-soft px-3 py-1.5 text-[13px] outline-none">
+            {sectors.map((s) => <option key={s}>{s}</option>)}
           </select>
-          <input type="search" value={filters.q} maxLength={QUERY_MAX} onChange={(e) => update({ q: e.target.value })}
-            placeholder="Filter" aria-label="Filter companies" enterKeyHint="search" autoComplete="off"
-            className="min-w-0 flex-1 sm:flex-none sm:w-44 rounded-full bg-soft px-3 py-1.5 text-[13px] outline-none placeholder:text-faint focus-visible:ring-2 focus-visible:ring-accent/40" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} maxLength={40} placeholder="Filter" aria-label="Filter companies"
+            className="min-w-0 flex-1 sm:flex-none sm:w-44 rounded-full bg-soft px-3 py-1.5 text-[13px] outline-none placeholder:text-faint" />
         </div>
-      </div>
-      <div className="flex items-center justify-between gap-3 min-h-6 mb-1 text-[12px] text-faint" aria-live="polite">
-        <span className="num">{shown.length === rows.length ? `${rows.length} companies` : `${shown.length} of ${rows.length} companies`}</span>
-        {!isDefault(filters) ? <button type="button" onClick={reset} className="text-accent hover:underline">Clear filters</button> : null}
       </div>
       <div className="overflow-x-auto -mx-2">
         <table className="w-full text-[14px]">
@@ -132,8 +127,7 @@ export function SignalsTable({ rows }: { rows: Row[] }) {
               <tr key={r.symbol} className="border-t border-line align-top">
                 <td className="px-2 py-2.5">
                   <span className="inline-flex items-center gap-2">
-                    {/* No prefetch: 269 rows would otherwise download every company page in the background. */}
-                    <Link href={companyHref(r.symbol)} prefetch={false} className="font-semibold hover:text-accent">{r.symbol}</Link>
+                    <Link href={companyHref(r.symbol)} className="font-semibold hover:text-accent">{r.symbol}</Link>
                     <StarButton symbol={r.symbol} />
                   </span>
                   <div className="text-[12px] text-muted truncate max-w-[200px] sm:max-w-[260px]">{r.name}</div>
@@ -153,12 +147,7 @@ export function SignalsTable({ rows }: { rows: Row[] }) {
             ))}
           </tbody>
         </table>
-        {!shown.length ? (
-          <p className="text-center text-muted py-8 text-[14px]">
-            {filters.mine && !watch.list.length ? "No stars yet: tap the star next to a company to add it to your stocks." : "No companies match these filters."}
-            {!isDefault(filters) ? <> <button type="button" onClick={reset} className="text-accent hover:underline">Clear filters</button></> : null}
-          </p>
-        ) : null}
+        {!shown.length ? <p className="text-center text-muted py-8 text-[14px]">{onlyMine && !watch.list.length ? "No stars yet: tap the star next to a company to add it to your stocks." : "No companies match."}</p> : null}
       </div>
     </div>
   );
