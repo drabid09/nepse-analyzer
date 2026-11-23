@@ -6,9 +6,10 @@ import { HealthBanner, SessionPill } from "@/components/HealthBanner";
 import { companies, health } from "@/lib/data";
 import { configured } from "@/lib/db";
 import { freshness } from "@/lib/market";
+import { BUILDER, SITE_NAME, VIEWER } from "@/lib/viewer";
 
 export const metadata: Metadata = {
-  title: { default: "NEPSE Analyzer", template: "%s · NEPSE Analyzer" },
+  title: { default: SITE_NAME, template: `%s · ${VIEWER}'s NEPSE` },
   description: "Nepal Stock Exchange prices, trends, price ranges and their measured track record. Educational analysis, not financial advice.",
   robots: { index: false, follow: false },
   // The commit this deployment was built from; the site monitor waits for it after each change.
@@ -41,9 +42,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en">
       <body className="min-h-screen">
         <header className="sticky top-0 z-30 border-b border-line bg-bg/80 backdrop-blur-xl">
-          <div className="mx-auto max-w-[1120px] px-4 sm:px-6 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mx-auto max-w-[1120px] px-4 sm:px-6 py-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center justify-between gap-4">
-              <Link href="/" className="text-[17px] font-semibold tracking-tight">NEPSE Analyzer</Link>
+              <Link href="/" className="text-[17px] font-semibold tracking-tight whitespace-nowrap">
+                <span className="lg:hidden">{VIEWER}&apos;s NEPSE</span><span className="hidden lg:inline">{SITE_NAME}</span>
+              </Link>
               {data ? <span className="sm:hidden"><SessionPill f={data.f} /></span> : null}
             </div>
             <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center">
@@ -59,7 +62,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           {data ? <HealthBanner f={data.f} /> : null}
           {children}
         </main>
-        <footer className="mx-auto max-w-[1120px] px-4 sm:px-6 pb-12 pt-4 text-[12px] leading-relaxed text-faint">
+        <footer className="mx-auto max-w-[1120px] px-4 sm:px-6 pb-12 pt-4 text-[12px] leading-relaxed text-faint space-y-3">
+          <p className="text-[14px] text-muted">
+            Missing something, or have your own view on a stock? <Link href="/feedback" className="text-accent underline underline-offset-2">Tell {BUILDER}</Link>.
+          </p>
+          <p>Made for {VIEWER} by {BUILDER}.</p>
           <p>
             Educational analysis, not financial advice. Calls and price ranges are produced by fixed rules from past prices; their measured
             track record is on the <Link href="/track-record" className="underline underline-offset-2">Track record</Link> page. Prices come from

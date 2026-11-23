@@ -70,3 +70,41 @@ def test_adjustments_multiply_through_earlier_prices(conn):
     assert [(str(d), float(c)) for _, d, c in closes] == [("2026-01-07", 101.0)]
     held = [str(r[0]) for r in conn.execute("select * from trading_days('2026-01-06')").fetchall()]
     assert held == ["2026-01-06", "2026-01-07", "2026-01-08"]
+
+
+def test_feedback_can_be_sent_but_not_read(conn):
+    conn.execute("set role anon")
+    try:
+        conn.execute("insert into feedback (kind, page, message) values ('idea', '/c/AAA', 'Show dividends please')")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            conn.execute("select message from feedback")
+    finally:
+        conn.execute("reset role")
+    row = conn.execute("select kind, page, message, name, status, notified_at from feedback order by id desc limit 1").fetchone()
+    assert row == ("idea", "/c/AAA", "Show dividends please", "Sanjeev", "new", None)
+
+
+def test_feedback_cannot_set_its_own_status_or_be_empty(conn):
+    conn.execute("set role anon")
+    try:
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            conn.execute("insert into feedback (kind, message, status) values ('idea', 'hello', 'done')")
+        with pytest.raises(psycopg.errors.CheckViolation):
+            conn.execute("insert into feedback (kind, message) values ('idea', '  ')")
+        with pytest.raises(psycopg.errors.CheckViolation):
+            conn.execute("insert into feedback (kind, message) values ('spam', 'hello there')")
+    finally:
+        conn.execute("reset role")
+
+
+def test_feedback_flood_is_refused(conn):
+    conn.execute("delete from feedback")
+    conn.execute("set role anon")
+    try:
+        for i in range(20):
+            conn.execute("insert into feedback (kind, message) values ('other', %s)", (f"message {i}",))
+        with pytest.raises(psycopg.errors.RaiseException, match="Too many messages"):
+            conn.execute("insert into feedback (kind, message) values ('other', 'one too many')")
+    finally:
+        conn.execute("reset role")
+    conn.execute("delete from feedback")

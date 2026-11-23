@@ -1,9 +1,10 @@
 import type { MetadataRoute } from "next";
+import { SITE_NAME } from "@/lib/viewer";
 
 // Lets the dashboard be added to a phone's home screen and open like an app.
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "NEPSE Analyzer",
+    name: SITE_NAME,
     short_name: "NEPSE",
     description: "Nepal Stock Exchange prices, calls, price ranges and their track record.",
     start_url: "/",

@@ -2,7 +2,7 @@
 
 Next.js (App Router, TypeScript, Tailwind) site for the NEPSE analyzer. Deployed on Vercel with this folder (`web/`) as the project root.
 
-It only reads: every query runs on the server with the Supabase project's publishable key, which row level security limits to reading. Pages are re-rendered at most once a minute and refresh themselves in the browser every minute during trading hours, and at once if the copy on screen is more than 90 seconds old.
+Every query runs on the server with the Supabase project's publishable key, which row level security limits to reading, plus sending a feedback message (insert-only, see `docs/sanjeev-edition.md`). Pages are re-rendered at most once a minute and refresh themselves in the browser every minute during trading hours, and at once if the copy on screen is more than 90 seconds old.
 
 ## Environment variables (Vercel project settings)
 
@@ -20,7 +20,8 @@ It only reads: every query runs on the server with the Supabase project's publis
 | `/c/SYMBOL` | Chart (adjusted or raw) with trade levels, call and reasons, price ranges, company track record, indicators, company facts, floorsheet summary, adjustments and data checks |
 | `/track-record` | Backtest of the calls and ranges, and the live record of published ranges |
 | `/health` | Each job's last run, data checks, recent runs |
-| `/guide` | Plain-language guide: what calls, scores, levels and ranges mean, and a check before buying or selling |
+| `/guide` | Step-by-step guide to every page, a worked example, and a reference of every term |
+| `/feedback` | "Tell Drabid": a private message box; the feedback workflow notifies Drabid through a GitHub issue that does not quote the message |
 
 ## Run locally
 

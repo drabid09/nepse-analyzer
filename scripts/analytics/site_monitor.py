@@ -4,7 +4,8 @@
 The watchdog checks the jobs and the database. This checks the last step, the
 website itself, the way a visitor sees it:
 
-  * every page loads (HTTP 200) and shows data, not an error or setup notice;
+  * every page loads (HTTP 200) and shows data, not an error or setup notice,
+    and the feedback form is there;
   * the latest final trading day on Data health is the database's;
   * the NEPSE index on the Market page is the database's latest value;
   * the number of companies on Signals is the number of signals stored;
@@ -169,7 +170,7 @@ def expected(db: Supabase) -> dict:
 def check(db: Supabase, client: httpx.Client) -> tuple[list[str], list[str], dict]:
     exp = expected(db)
     sample = exp["sample"]
-    pages = {p: Page(client, p) for p in ("/", "/signals", "/track-record", "/health", f"/c/{sample[0][0]}")}
+    pages = {p: Page(client, p) for p in ("/", "/signals", "/track-record", "/health", "/guide", "/feedback", f"/c/{sample[0][0]}")}
     problems: list[str] = []
     notes: list[str] = []
     secret = os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
@@ -196,6 +197,9 @@ def check(db: Supabase, client: httpx.Client) -> tuple[list[str], list[str], dic
         problems.append(f"Market page does not show the NEPSE index value {indian(exp['index_close'])}")
     if f"all {exp['signal_count']}" not in signals.text.lower():  # the page capitalises "all" with CSS
         problems.append(f"Signals page does not list {exp['signal_count']} companies")
+
+    if pages["/feedback"].status == 200 and "Your message" not in pages["/feedback"].text:
+        problems.append("/feedback: the feedback form is missing")
 
     rows = {r.split(" ", 1)[0]: r for r in signals.rows if r}
     for symbol, close in sample:

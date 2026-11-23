@@ -3,6 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PriceChart, type Bar } from "@/components/charts";
 import { Setup, Unavailable } from "@/components/states";
+import { StarButton } from "@/components/watchlist";
+import { BUILDER } from "@/lib/viewer";
 import { CallBadge, Card, Change, Empty, Pill, ScoreBar, Stat, Title, Trend } from "@/components/ui";
 import * as data from "@/lib/data";
 import { configured } from "@/lib/db";
@@ -73,6 +75,7 @@ async function Company({ company }: { company: data.Company }) {
           <div className="text-[13px] text-muted">{[sector, company.instrument_type].filter(Boolean).join(" · ")}</div>
           <h1 className="text-[28px] sm:text-[34px] font-semibold tracking-tight leading-tight">{company.symbol}</h1>
           <div className="text-[15px] text-muted">{company.name}</div>
+          <div className="mt-2"><StarButton symbol={company.symbol} label /></div>
         </div>
         <div className="text-right">
           <div className="num text-[34px] font-semibold tracking-tight leading-tight">{price(close)}</div>
@@ -273,7 +276,10 @@ async function Company({ company }: { company: data.Company }) {
         </Card>
       ) : null}
 
-      <p className="text-[13px]"><Link href="/signals" className="text-accent">← All signals</Link></p>
+      <div className="flex flex-wrap justify-between gap-3 text-[14px]">
+        <Link href="/signals" className="text-accent">← All signals</Link>
+        <Link href={`/feedback?about=${encodeURIComponent(company.symbol)}`} className="text-accent">Want to see more about {company.symbol}? Tell {BUILDER} →</Link>
+      </div>
     </div>
   );
 }
