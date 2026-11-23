@@ -12,7 +12,12 @@ import site_monitor as sm
 from conftest import FakeDB
 
 DAY = "2026-11-20"
-SAFE_HEADERS = {"x-content-type-options": "nosniff", "x-frame-options": "DENY", "referrer-policy": "strict-origin-when-cross-origin"}
+SAFE_HEADERS = {
+    "x-content-type-options": "nosniff", "x-frame-options": "DENY", "referrer-policy": "strict-origin-when-cross-origin",
+    "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'",
+    "strict-transport-security": "max-age=63072000; includeSubDomains",
+    "permissions-policy": "camera=(), microphone=()",
+}
 
 
 def test_lakh_grouping_matches_the_website():
@@ -125,3 +130,16 @@ def test_a_missing_feedback_form_is_caught():
     problems, _, _ = sm.check(db(), site({"/feedback": "<h1>Tell Drabid</h1>"}))
     assert "/feedback: the feedback form is missing" in problems
 
+
+
+@pytest.mark.parametrize("change, expected", [
+    ({"content-security-policy": None}, "no Content-Security-Policy"),
+    ({"content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-eval'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"}, "CSP allows 'unsafe-eval'"),
+    ({"content-security-policy": "default-src *; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"}, "CSP lacks default-src 'self'"),
+    ({"strict-transport-security": "max-age=300"}, "Strict-Transport-Security"),
+    ({"permissions-policy": None}, "no Permissions-Policy"),
+])
+def test_weak_security_headers_are_caught(change, expected):
+    headers = {k: v for k, v in {**SAFE_HEADERS, **change}.items() if v is not None}
+    problems, _, _ = sm.check(db(), site(headers=headers))
+    assert any(expected in p for p in problems), problems
