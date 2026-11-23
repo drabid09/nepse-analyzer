@@ -11,6 +11,8 @@ export const metadata: Metadata = {
   title: { default: "NEPSE Analyzer", template: "%s · NEPSE Analyzer" },
   description: "Nepal Stock Exchange prices, trends, price ranges and their measured track record. Educational analysis, not financial advice.",
   robots: { index: false, follow: false },
+  // The commit this deployment was built from; the site monitor waits for it after each change.
+  other: { "x-commit": process.env.VERCEL_GIT_COMMIT_SHA ?? "local" },
 };
 
 export const viewport: Viewport = {

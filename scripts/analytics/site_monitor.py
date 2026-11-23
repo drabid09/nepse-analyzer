@@ -15,11 +15,16 @@ website itself, the way a visitor sees it:
 Pages may be up to a minute behind the database (they are cached for 60 s), so a
 mismatch is retried twice, 75 s apart, before it counts. A failure fails the
 workflow, which makes GitHub email the repository owner.
+
+After a change to the website, EXPECT_COMMIT holds the commit just pushed: the
+monitor first waits for production to serve it (the page's x-commit meta tag),
+which also catches a deployment that failed to build.
 """
 
 from __future__ import annotations
 
 import os
+import re
 import sys
 import time as clock
 from datetime import date
@@ -37,6 +42,8 @@ NEPSE_INDEX_ID = 58
 ATTEMPTS = 3
 WAIT = 75  # seconds between attempts
 SAMPLE = 6
+DEPLOY_TIMEOUT = 15 * 60  # seconds to wait for a new deployment
+DEPLOY_POLL = 20
 ERROR_MARKERS = ("Data temporarily unavailable", "Something went wrong", "Almost ready")
 HEADERS = {"x-content-type-options": "nosniff", "x-frame-options": "DENY", "referrer-policy": "strict-origin-when-cross-origin"}
 
@@ -111,6 +118,25 @@ class Page:
         parser.feed(self.html)
         self.text = " ".join(" ".join(parser.parts).split())
         self.rows = parser.rows
+
+
+def served_commit(client: httpx.Client) -> str | None:
+    try:
+        html = client.get(SITE + "/").text
+    except httpx.HTTPError:
+        return None
+    match = re.search(r'<meta name="x-commit" content="([^"]+)"', html)
+    return match.group(1) if match else None
+
+
+def wait_for_commit(client: httpx.Client, sha: str, timeout: float = DEPLOY_TIMEOUT, poll: float = DEPLOY_POLL) -> tuple[bool, str | None]:
+    """Wait until production serves the given commit. Returns (served, last commit seen)."""
+    deadline = clock.monotonic() + timeout
+    seen = served_commit(client)
+    while seen != sha and clock.monotonic() < deadline:
+        clock.sleep(poll)
+        seen = served_commit(client)
+    return seen == sha, seen
 
 
 # ---------------------------------------------------------------- the database's view
@@ -192,7 +218,14 @@ def check(db: Supabase, client: httpx.Client) -> tuple[list[str], list[str], dic
 
 def main() -> None:
     db = Supabase()
+    expect = os.environ.get("EXPECT_COMMIT", "").strip()
     with httpx.Client(timeout=30, follow_redirects=True, headers={"User-Agent": "nepse-analyzer site monitor"}) as client:
+        if expect:
+            served, seen = wait_for_commit(client, expect)
+            if not served:
+                raise JobError(f"production still serves commit {seen or 'unknown'} {DEPLOY_TIMEOUT // 60} minutes after {expect[:7]} "
+                               "was pushed: the Vercel deployment may have failed. Check the project's Deployments page.")
+            print(f"production serves {expect[:7]}")
         for attempt in range(1, ATTEMPTS + 1):
             problems, notes, exp = check(db, client)
             if not problems or attempt == ATTEMPTS:
