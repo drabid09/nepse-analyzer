@@ -170,6 +170,13 @@ class Session:
                   "is_final": False, **summary_fields(summary)}
 
         db = self.db
+        if not is_open:
+            # The capture just after the close. If the end-of-day job has somehow
+            # already run, its final rows win.
+            final = db.select("market_daily", select="is_final", date=f"eq.{today}")
+            if final and final[0]["is_final"]:
+                print(f"{at:%H:%M:%S} {today} is already final; last snapshot not written", flush=True)
+                return False
         written = 0
         written += db.upsert("daily_prices", prices, on_conflict="company_id,date")
         if points:
