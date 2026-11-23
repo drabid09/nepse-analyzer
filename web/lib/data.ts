@@ -143,10 +143,14 @@ export async function indexDays() {
 export const indexIntraday = (indexId: number, sinceIso: string) =>
   rest<{ ts: string; value: number }>("index_intraday", { select: "ts,value", index_id: `eq.${indexId}`, ts: `gte.${sinceIso}`, order: "ts" }, { all: true });
 
-/** `symbol` must already be checked with parseSymbol (lib/symbol.ts). */
+/**
+ * `symbol` must already be checked with parseSymbol (lib/symbol.ts). Looked up in the company
+ * list the header already reads (cached for an hour), so a made-up symbol such as /c/QQQQ1
+ * costs no database read of its own. New listings arrive with the weekly company sync.
+ */
 export async function companyBySymbol(symbol: string) {
-  const rows = await rest<Company>("companies", { select: "*", symbol: `eq.${symbol}`, order: "id", limit: 1 }, { revalidate: HOUR });
-  return rows[0] ?? null;
+  const { list } = await companies();
+  return list.find((c) => c.symbol === symbol) ?? null;
 }
 
 const PRICE_COLUMNS = "date,open,high,low,close,prev_close,volume,turnover,trades,adj_factor,is_final";
