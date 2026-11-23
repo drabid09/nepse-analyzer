@@ -75,3 +75,23 @@ or on a production build against the mock database before it was fixed; each fix
 * `web/e2e/run.mjs` against a production build and the mock database: 80 checks, all passing
   (the 67 on `main` plus 13 new). The mock gains a price beyond the 10% limit (API), a flaky mode
   in which the first attempt of every read fails, and a log of the reads made.
+
+## Follow-up after deployment (23 Nov 2026, night)
+
+Rechecked on the live site after PR #16: no console errors on any page, no warnings or errors in
+Vercel's runtime logs, tests and the site monitor green on `main`. Four loose ends, fixed here:
+
+| # | Finding | Fix |
+|---|---|---|
+| F1 | **Breadth one company off.** By closing price 106 rose and 9 were unchanged; the news reported 105 and 10 (the totals, 280, and the 165 falling matched). NEPSE's day change compares the last trade with the previous close, and its closing price can differ from the last trade (NHPC: close 249.60, last trade 250.00 on ShareHub). | The live and end-of-day jobs count ordinary shares only, by NEPSE's own day change (`breadth` in `scripts/ingest/common.py`; last traded price, then closing price, when the change is missing). The end-of-day summary and run details list the shares where the closing price says otherwise, so the basis can be checked against the news. The Market page uses these counts when they cover the same shares as its prices, and its own count from closing prices otherwise (`settleBreadth`). First day counted this way: 24 Nov. |
+| F2 | **Every workflow warned that its actions run on deprecated Node.js 20** (`checkout@v4`, `setup-python@v5`, `setup-node@v4`, `upload-artifact@v4`). | All on `@v7` (Node.js 24). Checked against each action's v7 `action.yml`: every input used here still exists. Notable changes: checkout keeps the token in a separate file (git push from the probe still works), and refuses fork code under `pull_request_target`/`workflow_run` (not used here); setup-node v5+ caches by default (`cache: npm` is set anyway). |
+| F3 | **Company pages without details** (MCHL: market cap, listed shares, ISIN all "—"). The details job reads 110 of ~540 tradable securities a day, so a new database takes about five days. | Never-read ordinary shares are read first, then the rest by oldest check; a run started by hand takes a `batch` of up to 600 at the same 3-second pace (timeout 45 min). A company page without details says they have not been read yet instead of a column of dashes. |
+| F4 | **Six preview builds failed** for the in-between commits of PR #16, which was uploaded one folder at a time through GitHub's website. Harmless for production, but noise in the deployment list. | `web/vercel.json` skips the build of any commit whose message contains `[wip]`; multi-commit uploads mark every commit but the last. |
+
+Also: the click-through check "a watchdog that stopped reporting is marked late" depended on the
+time of day (the mock's watchdog last reported at 11:34, late only on a weekday afternoon); the
+mock now dates it 30 hours before the run.
+
+Verified: `npm test` 55, `pytest` 87 passed (11 need Postgres), e2e 82 against a production build
+and the mock database (the mock now stores breadth by NEPSE's day change, with its smallest rise
+counted as unchanged, and has a company whose details have not been read).
