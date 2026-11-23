@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { CallBadge, Change, ScoreBar, Trend } from "@/components/ui";
+import { StarButton, useWatchlist } from "@/components/watchlist";
 
 export type Row = {
   symbol: string; name: string; sector: string; close: number | null; change: number | null; call: string; dataOk: boolean;
@@ -22,12 +23,15 @@ export function SignalsTable({ rows }: { rows: Row[] }) {
   const [sector, setSector] = useState("All sectors");
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: "score", desc: true });
+  const [onlyMine, setOnlyMine] = useState(false);
+  const watch = useWatchlist();
   const sectors = useMemo(() => ["All sectors", ...Array.from(new Set(rows.map((r) => r.sector))).sort()], [rows]);
 
   const shown = useMemo(() => {
     const term = q.trim().toLowerCase();
     const list = rows.filter((r) => (call === "all" || r.call === call) && (sector === "All sectors" || r.sector === sector)
-      && (!term || r.symbol.toLowerCase().includes(term) || r.name.toLowerCase().includes(term)));
+      && (!term || r.symbol.toLowerCase().includes(term) || r.name.toLowerCase().includes(term))
+      && (!onlyMine || watch.list.includes(r.symbol)));
     const dir = sort.desc ? -1 : 1;
     return list.sort((a, b) => {
       const x = a[sort.key], y = b[sort.key];
@@ -35,7 +39,7 @@ export function SignalsTable({ rows }: { rows: Row[] }) {
       if (y === null) return -1;
       return (x < y ? -1 : x > y ? 1 : 0) * dir;
     });
-  }, [rows, call, sector, q, sort]);
+  }, [rows, call, sector, q, sort, onlyMine, watch.list]);
 
   const head = (key: SortKey, label: string, cls = "") => (
     <th className={`px-2 py-2 font-normal cursor-pointer select-none hover:text-ink ${cls}`}
@@ -54,6 +58,12 @@ export function SignalsTable({ rows }: { rows: Row[] }) {
               {k === "avoid" ? "No call" : k} <span className="num">{k === "all" ? rows.length : rows.filter((r) => r.call === k).length}</span>
             </button>
           ))}
+          {watch.mounted ? (
+            <button onClick={() => setOnlyMine((v) => !v)} aria-pressed={onlyMine}
+              className={`rounded-full px-3 py-1.5 text-[13px] ${onlyMine ? "bg-warn-soft text-warn" : "bg-soft text-muted hover:text-ink"}`}>
+              Your stocks <span className="num">{watch.list.filter((s) => rows.some((r) => r.symbol === s)).length}</span>
+            </button>
+          ) : null}
         </div>
         <div className="flex gap-2 min-w-0">
           <select value={sector} onChange={(e) => setSector(e.target.value)} aria-label="Sector"
@@ -82,7 +92,10 @@ export function SignalsTable({ rows }: { rows: Row[] }) {
             {shown.map((r) => (
               <tr key={r.symbol} className="border-t border-line align-top">
                 <td className="px-2 py-2.5">
-                  <Link href={`/c/${r.symbol}`} className="font-semibold hover:text-accent">{r.symbol}</Link>
+                  <span className="inline-flex items-center gap-2">
+                    <Link href={`/c/${r.symbol}`} className="font-semibold hover:text-accent">{r.symbol}</Link>
+                    <StarButton symbol={r.symbol} />
+                  </span>
                   <div className="text-[12px] text-muted truncate max-w-[200px] sm:max-w-[260px]">{r.name}</div>
                   {r.note ? <div className="text-[11px] text-warn mt-0.5 max-w-[260px]">{r.note}</div> : null}
                 </td>
@@ -100,7 +113,7 @@ export function SignalsTable({ rows }: { rows: Row[] }) {
             ))}
           </tbody>
         </table>
-        {!shown.length ? <p className="text-center text-muted py-8 text-[14px]">No companies match.</p> : null}
+        {!shown.length ? <p className="text-center text-muted py-8 text-[14px]">{onlyMine && !watch.list.length ? "No stars yet: tap the star next to a company to add it to your stocks." : "No companies match."}</p> : null}
       </div>
     </div>
   );
