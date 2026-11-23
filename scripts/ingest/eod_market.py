@@ -35,7 +35,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import (  # noqa: E402
     NPT, JobError, JobRun, NepseSource, Supabase, company_maps, lookup_company,
-    now_npt, num, run, whole, write_summary,
+    now_npt, num, run, started_by_hand, whole, write_summary,
 )
 from live_market import parse_npt, summary_fields  # noqa: E402
 import sharesansar  # noqa: E402
@@ -365,7 +365,7 @@ def storage(db: Supabase) -> dict:
 
 def main() -> None:
     now = now_npt()
-    forced = os.environ.get("GITHUB_EVENT_NAME") in ("push", "workflow_dispatch") or os.environ.get("EOD_FORCE") == "1"
+    forced = started_by_hand() or os.environ.get("EOD_FORCE") == "1"
     if now.weekday() < 5 and NO_RUN_FROM <= now.time() < EARLIEST:
         print(f"{now:%H:%M}: the session is on or about to start. The end-of-day job runs after {EARLIEST:%H:%M}.")
         return

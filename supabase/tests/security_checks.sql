@@ -36,7 +36,12 @@ declare
     'delete from public.feedback',
     'truncate public.feedback',
     'insert into public.feedback (kind, message, status) values (''other'', ''security test'', ''done'')',
-    'select public.feedback_limit()'
+    'select public.feedback_limit()',
+    -- The Supabase timer lives in its own schema, out of the public's reach.
+    'select count(*) from timer.plan',
+    'select count(*) from timer.dispatches',
+    'select timer.start(''watchdog.yml'')',
+    'select timer.check()'
   ];
 begin
   -- 1. Structure: 19 tables (15 from Phase 1, job_runs and price_adjustments
@@ -111,6 +116,17 @@ begin
       reset role;
       insert into check_results values ('signed-in write refused', false, 'ALLOWED: delete from public.companies');
   end;
+
+  -- 6. The timer's schema and the GitHub token in Vault are closed to visitors.
+  insert into check_results values ('public cannot see the timer schema',
+    not has_schema_privilege('anon', 'timer', 'USAGE') and not has_schema_privilege('authenticated', 'timer', 'USAGE'),
+    'usage on schema timer');
+  if to_regclass('vault.decrypted_secrets') is not null then
+    insert into check_results values ('public cannot read Vault',
+      not has_table_privilege('anon', 'vault.decrypted_secrets', 'SELECT')
+      and not has_table_privilege('authenticated', 'vault.decrypted_secrets', 'SELECT'),
+      'select on vault.decrypted_secrets');
+  end if;
 end
 $$;
 

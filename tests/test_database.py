@@ -108,3 +108,100 @@ def test_feedback_flood_is_refused(conn):
     finally:
         conn.execute("reset role")
     conn.execute("delete from feedback")
+
+
+# ---------------------------------------------------------------- Supabase timer
+# Stand-ins for Supabase Vault and pg_net, which a plain Postgres lacks:
+# net.http_post records the request instead of sending it.
+
+@pytest.fixture()
+def timer_db(conn):
+    conn.execute("""
+        create schema if not exists vault;
+        create table if not exists vault.decrypted_secrets (name text, decrypted_secret text, created_at timestamptz default now());
+        create schema if not exists net;
+        create table if not exists net.sent (id bigint generated always as identity, url text, body jsonb, headers jsonb);
+        create table if not exists net._http_response (id bigint, status_code integer, error_msg text);
+        create or replace function net.http_post(url text, body jsonb, headers jsonb, timeout_milliseconds integer)
+        returns bigint language sql as $$ insert into net.sent (url, body, headers) values (url, body, headers) returning id $$;
+        truncate vault.decrypted_secrets, net.sent, net._http_response, timer.dispatches;
+        delete from job_runs where job = 'timer';
+    """)
+    yield conn
+
+
+def answer(conn, status: int | None, error: str | None = None):
+    """GitHub answers the newest request; it is then over two minutes old."""
+    rid = conn.execute("select max(id) from net.sent").fetchone()[0]
+    if status is not None or error is not None:
+        conn.execute("insert into net._http_response (id, status_code, error_msg) values (%s, %s, %s)", (rid, status, error))
+    conn.execute("update timer.dispatches set sent_at = now() - interval '3 minutes'")
+
+
+def timer_rows(conn):
+    return conn.execute("select status, requests, message from job_runs where job = 'timer' order by id").fetchall()
+
+
+def test_timer_without_a_token_records_a_failure(timer_db):
+    assert timer_db.execute("select timer.start('market-eod.yml')").fetchone()[0] is None
+    assert timer_db.execute("select count(*) from net.sent").fetchone()[0] == 0
+    timer_db.execute("select timer.check()")
+    [(status, requests, message)] = timer_rows(timer_db)
+    assert (status, requests) == ("failed", 1)
+    assert "no GitHub token in Supabase Vault" in message
+
+
+def test_timer_starts_workflows_and_records_state_changes(timer_db):
+    timer_db.execute("insert into vault.decrypted_secrets (name, decrypted_secret) values ('github_actions_token', ' tok123 ')")
+    timer_db.execute("select timer.start('market-eod.yml')")
+    url, body, headers = timer_db.execute("select url, body, headers from net.sent").fetchone()
+    assert url == "https://api.github.com/repos/drabid09/nepse-analyzer/actions/workflows/market-eod.yml/dispatches"
+    assert body == {"ref": "main", "inputs": {"timer": "true"}}
+    assert headers["Authorization"] == "Bearer tok123"
+    assert headers["Accept"] == "application/vnd.github+json"
+
+    # Not answered yet and under two minutes old: not counted yet.
+    assert timer_db.execute("select timer.check()").fetchone()[0] == "nothing new to report"
+
+    answer(timer_db, 204)
+    timer_db.execute("select timer.check()")
+    assert timer_rows(timer_db) == [("ok", 1, "Started 1 GitHub job on time since the last check.")]
+
+    # Still working: the same row is updated, not a new one per hour.
+    timer_db.execute("select timer.start('feedback-notify.yml')")
+    answer(timer_db, 204)
+    timer_db.execute("select timer.start('watchdog.yml')")
+    answer(timer_db, 204)
+    timer_db.execute("select timer.check()")
+    assert timer_rows(timer_db) == [("ok", 3, "Started 2 GitHub jobs on time since the last check.")]
+
+    # The token expires: a new failed row with a plain explanation.
+    timer_db.execute("select timer.start('watchdog.yml')")
+    answer(timer_db, 401)
+    timer_db.execute("select timer.check()")
+    rows = timer_rows(timer_db)
+    assert [r[0] for r in rows] == ["ok", "failed"]
+    assert "probably expired" in rows[-1][2] and "github_actions_token" in rows[-1][2]
+
+    # No answer at all also counts as a failure, and recovery adds an ok row.
+    timer_db.execute("select timer.start('watchdog.yml')")
+    answer(timer_db, None, "Timeout of 15000 ms reached")
+    timer_db.execute("select timer.check()")
+    assert "No answer from GitHub: Timeout" in timer_rows(timer_db)[-1][2]
+    timer_db.execute("select timer.start('watchdog.yml')")
+    answer(timer_db, 204)
+    timer_db.execute("select timer.check()")
+    assert [r[0] for r in timer_rows(timer_db)] == ["ok", "failed", "ok"]
+
+
+def test_timer_only_starts_planned_workflows(timer_db):
+    with pytest.raises(psycopg.errors.RaiseException, match="not in timer.plan"):
+        timer_db.execute("select timer.start('../../evil')")
+
+
+def test_timer_plan_has_every_workflow_once_per_time(timer_db):
+    rows = timer_db.execute("select workflow, count(*) from timer.plan group by workflow order by workflow").fetchall()
+    assert dict(rows) == {"analytics-daily.yml": 3, "backtest-weekly.yml": 1, "backup-weekly.yml": 1,
+                          "company-details.yml": 1, "feedback-notify.yml": 1, "keepalive.yml": 1,
+                          "market-eod.yml": 3, "market-live.yml": 3, "site-monitor.yml": 2,
+                          "sync-companies.yml": 1, "watchdog.yml": 2}

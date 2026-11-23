@@ -236,6 +236,16 @@ def runner_name() -> str:
     return os.environ.get("RUNNER_LABEL") or socket.gethostname()
 
 
+def started_by_hand() -> bool:
+    """True for a run started from GitHub's "Run workflow" button or by a push.
+
+    Such runs redo work that is already done. Runs started on a timer (GitHub's
+    schedule, or the Supabase timer, which sends the input timer=true) do not.
+    """
+    return (os.environ.get("GITHUB_EVENT_NAME") in ("push", "workflow_dispatch")
+            and os.environ.get("RUN_BY_TIMER") != "1")
+
+
 def run_url() -> str | None:
     if os.environ.get("GITHUB_RUN_ID"):
         return f"{os.environ.get('GITHUB_SERVER_URL', 'https://github.com')}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}"

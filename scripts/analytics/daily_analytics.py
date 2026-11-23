@@ -34,7 +34,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "ingest"))
 import engine  # noqa: E402
-from common import JobError, JobRun, Supabase, now_npt, run, write_summary  # noqa: E402
+from common import JobError, JobRun, Supabase, now_npt, run, started_by_hand, write_summary  # noqa: E402
 
 MODEL_VERSION = "rules-v1"
 HISTORY_DAYS = 1100           # calendar days of prices loaded (about 3 years of trading)
@@ -251,7 +251,7 @@ def num(x, digits=4):
 
 
 def main() -> None:
-    forced = os.environ.get("GITHUB_EVENT_NAME") in ("push", "workflow_dispatch") or os.environ.get("ANALYTICS_FORCE") == "1"
+    forced = started_by_hand() or os.environ.get("ANALYTICS_FORCE") == "1"
     db = Supabase()
     trade_date = latest_final_day(db)
     if not trade_date:

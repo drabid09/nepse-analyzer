@@ -15,6 +15,11 @@ on:
     - cron: "12 6 * * 1-5"    # 11:57 backup
     - cron: "42 7 * * 1-5"    # 13:27 backup
   workflow_dispatch:
+    inputs:
+      timer:
+        description: "Started by the Supabase timer: behave like a scheduled run"
+        type: boolean
+        default: false
   push:
     branches: ["phase-2/**"]
     paths:
