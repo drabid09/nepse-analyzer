@@ -14,6 +14,10 @@ on:
         description: "Started by the Supabase timer: behave like a scheduled run"
         type: boolean
         default: false
+      batch:
+        description: "Companies to refresh (110 a day; up to 600 to catch up, about 3 s each)"
+        type: number
+        default: 110
   push:
     branches: ["phase-2/**"]
     paths:
@@ -30,13 +34,13 @@ concurrency:
 jobs:
   details:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45   # a 600-company catch-up takes about 31 minutes
     env:
       TZ: Asia/Kathmandu
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           cache: pip
@@ -49,4 +53,5 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          DETAILS_BATCH: ${{ inputs.batch || 110 }}
         run: python scripts/ingest/company_details.py

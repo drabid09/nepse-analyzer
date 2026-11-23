@@ -33,17 +33,17 @@ jobs:
     env:
       TZ: Asia/Kathmandu
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check out the history dataset at a pinned commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: Aabishkar2/nepse-data
           ref: 29134e740b69053eb4541610037897a56cf24ede   # 20 Nov 2026, last trading day before Phase 2
           path: dataset
           sparse-checkout: data/company-wise
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           cache: pip
