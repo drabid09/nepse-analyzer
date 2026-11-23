@@ -68,7 +68,13 @@ Read back from the database after the runs, not taken from the jobs' own reports
 
 ### Trading hours
 
-The first live session is today, 23 Nov 2026. The run started at 09:48 and polled every 5 minutes until the 11:00 open. Its snapshot count, data lag and failures, and today's end-of-day run, are added here after the close. They answer Phase 0's open question about how fresh NEPSE's live list is during trading.
+First session, 23 Nov 2026. The run started at 09:48 and polled every 5 minutes. NEPSE first reported the market open at the 11:00:20 snapshot (nothing traded yet). At 11:05:20:
+
+- 135 securities traded, 135 intraday points, 17 index values, and running market totals: Rs 52.1 million turnover, 474 transactions, 50 advancers, 61 decliners.
+- **The newest trade in NEPSE's live list was 22 seconds older than our snapshot.** The list is close to real time during trading, which answers Phase 0's open question about freshness.
+- The run's `job_runs` row (status `running`) is updated at every snapshot, so the website can show "last updated" and spot a stalled job.
+
+The session's totals (snapshots, failures, lag range) and today's end-of-day run are added below once they are in.
 
 ## Data quality notes
 
