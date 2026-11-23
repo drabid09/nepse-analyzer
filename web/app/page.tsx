@@ -4,7 +4,10 @@ import { Card, Change, Empty, Pill, ScoreBar, Stat, Title } from "@/components/u
 import * as data from "@/lib/data";
 import { configured } from "@/lib/db";
 import { Setup, Unavailable } from "@/components/states";
+import { YourStocks, type WatchRow } from "@/components/watchlist";
 import { change, day, num, price, rupees, whole } from "@/lib/format";
+import { nepalNow } from "@/lib/market";
+import { VIEWER } from "@/lib/viewer";
 
 export const revalidate = 60;
 
@@ -40,8 +43,40 @@ async function Market() {
   const indexName = new Map(indexInfo.map((i) => [i.id, i.name]));
   const nepseChange = nepseDay ? change(nepseDay.close, nepseDay.prev_close) : null;
 
+  // Every company's latest numbers, for the stars this browser has saved ("Your stocks").
+  const signalBy = new Map(signals.map((s) => [s.company_id, s]));
+  const watchRows: WatchRow[] = prices.rows.flatMap((p) => {
+    const co = c.byId.get(p.company_id);
+    if (!co) return [];
+    const s = signalBy.get(p.company_id), r = rangeBy.get(p.company_id);
+    return [{
+      symbol: co.symbol, name: co.name, close: num(p.close), change: change(p.close, p.prev_close),
+      call: s ? (s.data_ok ? s.recommendation : "avoid") : null, dataOk: s?.data_ok ?? true, score: s ? s.score : null,
+      low: num(r?.low), high: num(r?.high),
+    }];
+  });
+
+  const now = nepalNow();
+  const tradingHours = now.weekday && now.minutes >= 11 * 60 && now.minutes < 15 * 60;
+  const status = live
+    ? "The market is open. Prices update about every 5 minutes."
+    : tradingHours
+      ? `Live prices have not arrived yet today. These are the prices from ${day(prices.date)}.`
+      : prices.date === now.date
+        ? "The market has closed. These are today's final prices; new calls arrive at about 15:50."
+        : `The market is closed. These are the prices from ${day(prices.date)}.`;
+
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+        <div>
+          <h1 className="text-[28px] sm:text-[34px] font-semibold tracking-tight">Namaste, {VIEWER}</h1>
+          <p className="text-[15px] text-muted mt-1">{status}</p>
+        </div>
+        <Link href="/guide" className="text-[14px] text-accent">How to read this page →</Link>
+      </div>
+
+      <YourStocks rows={watchRows} viewer={VIEWER} />
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
         <Card>
           <div className="flex items-start justify-between gap-4">
