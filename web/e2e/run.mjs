@@ -295,6 +295,54 @@ await page.goto(`${BASE}/feedback?about=%3Cimg%20src%3Dx%20onerror%3Dalert(1)%3E
   check("search: Enter with no match does nothing", page.url().includes("/c/"));
 }
 
+// ---------------------------------------------------------------- follow-up audit, 24 Nov
+{
+  // Track record: live coverage counted in the database view (1500 scored ranges, 1 in 5 outside).
+  await page.goto(`${BASE}/track-record`, { waitUntil: "load" });
+  const text = await page.locator("main").innerText();
+  check("track record: live coverage comes from the view (80% inside, 500 checked per horizon)",
+    (text.match(/80% inside/g) ?? []).length === 3 && (text.match(/500 ranges checked/g) ?? []).length === 3, text.match(/Live record[\s\S]{0,200}/)?.[0]);
+
+  // Malformed company addresses: 404 straight away, never a server error.
+  for (const path of ["/c/%E0%A4", "/c/NABIL%00", `/c/${"A".repeat(300)}`, "/c/..%2F..%2Fetc%2Fpasswd", "/c/%3Cscript%3E"]) {
+    const r = await fetch(BASE + path, { redirect: "manual" });
+    check(`address ${path.slice(0, 28)} answers 404`, r.status === 404, String(r.status));
+  }
+  const unknown = await fetch(`${BASE}/no-such-page`);
+  const unknownText = await unknown.text();
+  check("an unknown page says 'Page not found', not 'no company'", unknown.status === 404 && /Page not found/.test(unknownText) && !/No company with that symbol/.test(unknownText));
+  const noCompany = await fetch(`${BASE}/c/ZZZZ`);
+  check("an unknown symbol says 'Company not found'", noCompany.status === 404 && /Company not found/.test(await noCompany.text()));
+
+  // Debentures: symbols with a slash.
+  const deb = `/c/${encodeURIComponent("GBD80/81")}`;
+  await page.goto(BASE + deb, { waitUntil: "load" });
+  check("debenture page opens at /c/GBD80%2F81", (await page.locator("main h1").innerText()) === "GBD80/81");
+  const old = await fetch(`${BASE}/c/GBD80/81`, { redirect: "manual" });
+  check("an unencoded debenture link redirects to its page", [307, 308].includes(old.status) && (old.headers.get("location") ?? "").endsWith(deb), `${old.status} ${old.headers.get("location")}`);
+  const lower = await fetch(`${BASE}/c/gbd80%2f81`, { redirect: "manual" });
+  check("lower case debenture address redirects once to the canonical one", [307, 308].includes(lower.status) && (lower.headers.get("location") ?? "").endsWith(deb), `${lower.status}`);
+  const star = page.getByRole("button", { name: /your stocks/i }).first();
+  await star.click(); await sleep(200);
+  check("a debenture can be starred", (await page.evaluate(() => localStorage.getItem("nepse-watchlist-v1") ?? "")).includes("GBD80/81"));
+  await star.click(); await sleep(200);
+  await page.goto(`${BASE}/`, { waitUntil: "load" });
+  const box = page.getByRole("combobox").first();
+  await box.fill("GBD80/81");
+  await box.press("Enter");
+  await page.waitForLoadState("load"); await sleep(500);
+  check("search: Enter on a debenture opens its page", page.url().endsWith(deb), page.url());
+
+  // Feedback with a NUL character (Postgres refuses it): cleaned and sent, not "could not be sent".
+  await page.goto(`${BASE}/feedback`, { waitUntil: "load" });
+  const sent0 = (await mode("")).feedback;
+  await page.getByLabel("Your message").fill("pasted text with a \u0000 NUL character");
+  await page.getByRole("button", { name: /Send to/ }).click();
+  await sleep(1200);
+  const sent1 = (await mode("")).feedback;
+  check("feedback with a NUL character is cleaned and sent", sent1 - sent0 === 1 && /Sent\. Thank you/.test(await page.locator("main").innerText()), `${sent1 - sent0} sent`);
+}
+
 // ---------------------------------------------------------------- phone width
 {
   const phone = await browser.newContext({ ...devices["iPhone 13"] });

@@ -32,6 +32,12 @@ const companies = SYMBOLS.map(([symbol, sector_id], i) => ({
   isin: `NPE${String(i).padStart(9, "0")}`, listing_date: "2010-01-01", face_value: 100, listed_shares: 1e7 + i * 1e5,
   paid_up_capital: 1e9, market_cap: 5e9 + i * 1e8, promoter_pct: 51, public_pct: 49, nepse_security_id: 100 + i,
 }));
+// A debenture: NEPSE writes these symbols with a slash.
+companies.push({
+  id: companies.length + 1, symbol: "GBD80/81", name: "Garima Bikas Bank Debenture 2080/81", sector_id: null,
+  instrument_type: "Non-Convertible Debentures", is_tradable: true, isin: "NPE000000999", listing_date: "2020-01-01", face_value: 1000,
+  listed_shares: 1e5, paid_up_capital: null, market_cap: null, promoter_pct: null, public_pct: null, nepse_security_id: 999,
+});
 const NOT_TRADED_TODAY = new Set(["NLO"]);
 
 function weekdays(end, n) {
@@ -143,9 +149,17 @@ const backtest_results = [
 ];
 const floorsheet_daily = [{ company_id: 1, date: LATEST, trades: 120, quantity: 30000, amount: 16500000, vwap: 549.5, largest_trade_qty: 2000, buyer_brokers: 30, seller_brokers: 28, top_buyers: [{ broker: 58, qty: 5000, amount: 1 }], top_sellers: [{ broker: 34, qty: 4000, amount: 1 }] }];
 
+// The view forecast_live_record (supabase/migrations/20261124000100): checked ranges per horizon.
+const scored = forecasts.filter((f) => f.model === "ensemble" && f.actual_close !== null);
+const forecast_live_record = ["1W", "1M", "3M"].map((horizon) => {
+  const rows = scored.filter((f) => f.horizon === horizon);
+  return { horizon, checked: rows.length, inside: rows.filter((f) => f.low <= f.actual_close && f.actual_close <= f.high).length };
+}).filter((r) => r.checked);
+
 const TABLES = {
   sectors, companies, daily_prices, signals, forecasts, indices, index_daily, index_intraday, market_daily, job_runs,
   latest_job_runs: job_runs, quality_issues, backtest_results, floorsheet_daily, price_adjustments: [], intraday_snapshots: [],
+  forecast_live_record,
 };
 
 // ------------------------------------------------------------------ query engine
@@ -235,6 +249,8 @@ const server = http.createServer(async (req, res) => {
     for await (const chunk of req) body += chunk;
     if (mode.feedback === "fail") return send(500, { message: "boom" });
     if (mode.feedback === "toomany") return send(400, { code: "P0001", message: "Too many messages right now. Please try again later." });
+    // Like Postgres: text cannot contain a NUL character.
+    if (body.includes("\\u0000")) return send(400, { code: "22P05", message: "unsupported Unicode escape sequence" });
     feedback.push(JSON.parse(body));
     return send(201);
   }
