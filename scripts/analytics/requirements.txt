@@ -1,0 +1,4 @@
+# Analytics jobs: indicators, signals, forecasts, backtests.
+numpy==2.1.3
+pandas==2.2.3
+httpx[http2]==0.28.1
