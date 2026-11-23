@@ -121,9 +121,9 @@ export const marketDays = (n = 2) => rest<MarketDay>("market_daily", { select: "
 export const indices = () => rest<IndexInfo>("indices", { select: "id,code,name,kind", order: "id" }, { revalidate: HOUR });
 
 /**
- * The latest day of every index. After the close NEPSE reports the main indices' previous
- * close equal to the close (23 Nov 2026: NEPSE 0.00% instead of +0.09%), so a previous close
- * that is missing or identical to the close is replaced with the last final close stored.
+ * The latest day of every index, with the previous close taken from our own final close of
+ * the previous trading day (NEPSE's own field rolls over to the close after the market
+ * shuts: lib/indices.ts). The previous trading day is the last market day stored before.
  */
 export async function indexDays() {
   const last = await rest<{ date: string }>("index_daily", { select: "date", order: "date.desc", limit: 1 });
@@ -131,7 +131,7 @@ export async function indexDays() {
   if (!date) return { date: null as string | null, rows: [] as IndexDay[] };
   const [rows, before] = await Promise.all([
     rest<IndexDay>("index_daily", { select: "*", date: `eq.${date}`, order: "index_id" }),
-    rest<{ date: string }>("index_daily", { select: "date", date: `lt.${date}`, is_final: "eq.true", order: "date.desc", limit: 1 }, { revalidate: DAILY }),
+    rest<{ date: string }>("market_daily", { select: "date", date: `lt.${date}`, order: "date.desc", limit: 1 }, { revalidate: DAILY }),
   ]);
   const previous = before[0]?.date
     ? await rest<{ index_id: number; close: number }>("index_daily", { select: "index_id,close", date: `eq.${before[0].date}`, is_final: "eq.true", order: "index_id" }, { revalidate: DAILY })

@@ -102,10 +102,11 @@ def test_missing_previous_close_is_filled_from_the_stored_close():
     assert rows[0]["prev_close"] == 1586.0
 
 
-def test_a_reported_previous_close_that_differs_is_trusted():
-    rows = [{"index_id": 51, "close": 1596.27, "prev_close": 1586.00}]
-    settle_index_prev_close(rows, {51: 1500.0})
-    assert rows[0]["prev_close"] == 1586.00
+def test_a_rolled_over_value_a_rounding_step_away_is_replaced_too():
+    # Sensitive showed -0.00%: previousClose 478.53 against a close of 478.52.
+    rows = [{"index_id": 57, "close": 478.52, "prev_close": 478.53}]
+    settle_index_prev_close(rows, {57: 477.90})
+    assert rows[0]["prev_close"] == 477.90
 
 
 def test_without_a_stored_close_nothing_changes():
