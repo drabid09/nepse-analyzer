@@ -343,6 +343,130 @@ await page.goto(`${BASE}/feedback?about=%3Cimg%20src%3Dx%20onerror%3Dalert(1)%3E
   check("feedback with a NUL character is cleaned and sent", sent1 - sent0 === 1 && /Sent\. Thank you/.test(await page.locator("main").innerText()), `${sent1 - sent0} sent`);
 }
 
+// ---------------------------------------------------------------- second pass, 23 Nov evening
+const seen = () => fetch(`${MOCK}/__seen`).then((r) => r.json());
+
+// Choose a filter and open a company at once (inside the 250 ms the address waits), then Back.
+{
+  await page.goto(`${BASE}/signals`, { waitUntil: "load" });
+  await page.getByRole("button", { name: /^sell/i }).click();
+  await page.locator("main tbody tr a").first().click({ delay: 0 });
+  await page.waitForURL(/\/c\//);
+  await page.waitForLoadState("load"); await sleep(300);
+  await page.goBack();
+  await page.waitForURL(/\/signals/); await sleep(500);
+  const pressed = (await page.locator('[aria-label="Filter by call"] button[aria-pressed="true"]').first().innerText()).trim();
+  check("a filter chosen just before opening a company is still there after Back", /call=sell/.test(page.url()) && /^sell/i.test(pressed), `${page.url()} ${pressed}`);
+}
+
+// The Signals tab pressed while on a filtered Signals page: the table must match the plain address.
+{
+  await page.goto(`${BASE}/signals?call=sell&sector=Hydro+Power`, { waitUntil: "load" });
+  await sleep(300);
+  await page.locator("header nav").getByRole("link", { name: "Signals" }).click();
+  await sleep(900);
+  const all = await page.getByRole("button", { name: /^all/i }).getAttribute("aria-pressed");
+  const sector = await page.getByLabel("Sector").inputValue();
+  check("Signals tab on a filtered table shows every company, matching the plain address",
+    new URL(page.url()).search === "" && all === "true" && sector === "All sectors" && (await tableRows()) === (await chipCount(0)), `${page.url()} all=${all} sector=${sector}`);
+  await page.goBack(); await sleep(700);
+  const sell = await page.getByRole("button", { name: /^sell/i }).getAttribute("aria-pressed");
+  check("Back from there restores the filtered table", /call=sell/.test(page.url()) && sell === "true" && (await page.getByLabel("Sector").inputValue()) === "Hydro Power", page.url());
+}
+
+// Search on a slow phone: type fast and press Enter at once.
+{
+  const cdp = await context.newCDPSession(page);
+  const landed = [];
+  for (const term of ["sbl", "cfcl", "nica", "shel"]) {
+    await page.goto(`${BASE}/`, { waitUntil: "load" });
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 8 });
+    await page.getByRole("combobox", { name: /Search a company/ }).click();
+    await page.keyboard.type(term, { delay: 0 });
+    await page.keyboard.press("Enter");
+    await page.waitForURL(/\/c\//, { timeout: 8000 }).catch(() => {});
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+    landed.push(new URL(page.url()).pathname);
+  }
+  await cdp.detach();
+  check("search: fast typing then Enter opens the typed company (CPU x8)", landed.join() === "/c/SBL,/c/CFCL,/c/NICA,/c/SHEL", landed.join());
+  // A fresh tab: browsers cap a tab's history at 50 entries, which this long run has reached.
+  const tab = await context.newPage();
+  await tab.goto(`${BASE}/guide`, { waitUntil: "load" });
+  const before = await tab.evaluate(() => history.length);
+  const box = tab.getByRole("combobox", { name: /Search a company/ });
+  await box.fill("nabil"); await sleep(200);
+  await box.press("Enter"); await box.press("Enter");
+  await tab.waitForURL(/\/c\/NABIL$/); await sleep(800);
+  const added = (await tab.evaluate(() => history.length)) - before;
+  await tab.close();
+  check("search: a double Enter adds one history entry", added === 1, `${added} added`);
+}
+
+// Made-up symbols are looked up in the cached company list: no database read of their own.
+{
+  const statuses = [];
+  for (const p of ["/c/QQQQ1", "/c/ZZZZ9"]) statuses.push((await fetch(BASE + p, { redirect: "manual" })).status);
+  const reads = (await seen()).filter((u) => /QQQQ1|ZZZZ9/.test(u));
+  check("made-up symbols are a 404 without a database read of their own", statuses.every((s) => s === 404) && reads.length === 0, `${statuses.join()} reads=${reads.length}`);
+}
+
+// Market page: breadth over shares, labels, and a price that failed its data check is marked.
+{
+  await page.goto(`${BASE}/signals`, { waitUntil: "load" });
+  // Ordinary shares only: the mock's debenture (GBD80/81) has a row in Signals, real data does not.
+  const changes = await page.locator("main tbody tr").evaluateAll((rows) => rows
+    .filter((r) => !(r.querySelector("a")?.textContent ?? "").includes("/"))
+    .map((r) => r.children[2]?.textContent ?? ""));
+  const up = changes.filter((t) => /^\+/.test(t.trim())).length, down = changes.filter((t) => /^-/.test(t.trim())).length;
+  await page.goto(`${BASE}/`, { waitUntil: "load" });
+  const market = page.locator("section", { hasText: "Shares rising" });
+  const stat = async (label) => Number((await market.locator("div.min-w-0", { hasText: label }).locator("div").nth(1).innerText()).replace(/[^0-9]/g, ""));
+  const rising = await stat("Shares rising"), falling = await stat("Shares falling");
+  const text = await page.locator("main").innerText();
+  check("market breadth counts shares and matches the Signals table", rising === up && falling === down && /Securities traded/i.test(text) && !/Companies traded/i.test(text), `rising ${rising}/${up} falling ${falling}/${down}`);
+  const top = page.locator("section", { hasText: "Top gainers" }).locator("li").first();
+  check("a gainer whose price failed the data check is marked", /API/.test(await top.innerText()) && /data check failed/.test(await top.innerText()), (await top.innerText()).replace(/\n/g, " "));
+  check("the Sectors card names the day instead of 'today'", /Change of each NEPSE index on Mon, 23 Nov 2026/.test(text));
+}
+
+// Feedback: a message being written survives a refresh, and is gone once sent.
+{
+  await page.goto(`${BASE}/feedback?about=NABIL`, { waitUntil: "load" });
+  const draft = "Draft that must survive a refresh.";
+  await page.getByLabel("Your message").fill(draft);
+  await sleep(200);
+  await page.reload({ waitUntil: "load" }); await sleep(500);
+  check("feedback: a message being written survives a refresh", (await page.getByLabel("Your message").inputValue()) === draft);
+  await page.getByRole("button", { name: /Send to/ }).click();
+  await page.waitForSelector("text=Sent. Thank you", { timeout: 5000 }).catch(() => {});
+  await page.goto(`${BASE}/feedback?about=NABIL`, { waitUntil: "load" }); await sleep(500);
+  check("feedback: the draft is cleared once sent", (await page.getByLabel("Your message").inputValue()) === "");
+}
+
+// A brief database hiccup: the first attempt of every read fails. Pages are read again once.
+{
+  await mode("db=flaky");
+  const res = await page.goto(`${BASE}/c/UPPER`, { waitUntil: "load" });
+  const text = await page.locator("main").innerText();
+  await mode("db=ok");
+  check("a brief database hiccup does not blank the page", res.status() === 200 && /UPPER/.test(text) && !/Data temporarily unavailable/.test(text));
+}
+
+// An "unavailable" page recovers by itself once the database answers again (no reload).
+{
+  await mode("db=down");
+  await page.goto(`${BASE}/c/PROFL`, { waitUntil: "load" });
+  const down = /Data temporarily unavailable/.test(await page.locator("main").innerText());
+  await mode("db=ok");
+  let waited = 0, back = false;
+  while (waited < 160) {
+    await sleep(5000); waited += 5;
+    if (/PROFL/.test(await page.locator("main h1").first().innerText().catch(() => ""))) { back = true; break; }
+  }
+  check("an 'unavailable' page recovers by itself once the database answers", down && back, `shown=${down} recovered after ~${waited}s`);
+}
+
 // ---------------------------------------------------------------- phone width
 {
   const phone = await browser.newContext({ ...devices["iPhone 13"] });

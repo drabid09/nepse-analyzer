@@ -6,7 +6,8 @@
 //
 // It understands the filters the dashboard uses (eq, lt, lte, gt, gte, is.null, not.is.null,
 // and=(...)), select, order, limit and the Range header. GET /__mode?db=down|slow|ok&feedback=ok|fail|toomany
-// switches failure modes for the tests.
+// switches failure modes for the tests (db=flaky fails the first attempt of every read with a
+// 503). GET /__seen lists the latest read URLs.
 
 import http from "node:http";
 
@@ -68,6 +69,15 @@ for (const c of companies) {
     });
     prev = close;
   }
+}
+// API's latest close is +10.6% from the day before, beyond NEPSE's 10% limit, like MCHL on
+// 23 Nov 2026: its data check fails (data_ok false below) and it heads the gainers.
+{
+  const rows = daily_prices.filter((p) => p.company_id === companies.find((c) => c.symbol === "API").id);
+  const last = rows.at(-1), before = rows.at(-2);
+  last.close = +(before.close * 1.106).toFixed(2);
+  last.high = Math.max(last.high, last.close);
+  last.prev_close = before.close;
 }
 const lastClose = new Map();
 for (const p of daily_prices) lastClose.set(p.company_id, p);
@@ -229,6 +239,8 @@ function query(table, params, range) {
   return { status: 200, body: rows };
 }
 
+const flakySeen = new Set();
+const seen = []; // the last 2,000 read URLs, for tests that check which reads were made
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const send = (status, body) => { res.writeHead(status, { "Content-Type": "application/json" }); res.end(body === undefined ? "" : JSON.stringify(body)); };
@@ -237,10 +249,18 @@ const server = http.createServer(async (req, res) => {
     return send(200, { ...mode, requests, feedback: feedback.length });
   }
   if (url.pathname === "/__stats") return send(200, { requests, feedback });
+  if (url.pathname === "/__seen") return send(200, seen);
   requests++;
+  try { seen.push(decodeURIComponent(req.url)); } catch { seen.push(req.url); }
+  if (seen.length > 2000) seen.shift();
   const key = req.headers.apikey;
   if (!key) return send(401, { message: "No API key found in request" });
   if (mode.db === "down") return send(503, { message: "upstream connect error: internal host db.internal:5432" });
+  // "flaky": the first attempt of every read gets a gateway error, as a brief Supabase hiccup does.
+  if (mode.db === "flaky" && req.method === "GET") {
+    const key = `${req.url} ${req.headers.range ?? ""}`;
+    if (!flakySeen.has(key)) { flakySeen.add(key); return send(503, { message: "upstream connect error" }); }
+  }
   if (mode.db === "slow") await new Promise((r) => setTimeout(r, 4000));
   const m = /^\/rest\/v1\/([a-z_]+)$/.exec(url.pathname);
   if (!m) return send(404, { message: "not found" });
