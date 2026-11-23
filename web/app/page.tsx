@@ -6,7 +6,7 @@ import { configured } from "@/lib/db";
 import { Setup, Unavailable } from "@/components/states";
 import { YourStocks, type WatchRow } from "@/components/watchlist";
 import { change, day, num, price, rupees, whole } from "@/lib/format";
-import { breadth, statusLine } from "@/lib/market";
+import { breadth, settleBreadth, statusLine } from "@/lib/market";
 import { companyHref } from "@/lib/symbol";
 import { VIEWER } from "@/lib/viewer";
 
@@ -32,9 +32,10 @@ async function Market() {
   const live = prices.rows.length > 0 && prices.rows.some((p) => !p.is_final);
 
   const equities = prices.rows.filter((p) => c.byId.get(p.company_id)?.instrument_type === "Equity" && p.prev_close);
-  // Rising and falling counted over ordinary shares, as NEPSE reports it; market_daily counts every
-  // traded security (debentures, mutual funds, promoter shares). Only when both are the same day.
-  const shares = today && today.date === prices.date ? breadth(equities.map((p) => change(p.close, p.prev_close))) : null;
+  // Rising and falling ordinary shares, as NEPSE reports it: the jobs' count by NEPSE's own day change
+  // when it covers the same shares, else counted here from closing prices (lib/market.ts settleBreadth).
+  // Only when the market totals and the prices are the same day.
+  const shares = today && today.date === prices.date ? settleBreadth(breadth(equities.map((p) => change(p.close, p.prev_close))), today) : null;
   // A price that failed the day's own data check (e.g. beyond NEPSE's 10% daily limit) is still
   // shown, but marked, so a doubtful number never heads a list unannounced.
   const flagged = new Set(signals.filter((s) => !s.data_ok && s.date === prices.date).map((s) => s.company_id));
