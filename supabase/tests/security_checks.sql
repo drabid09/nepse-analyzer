@@ -24,13 +24,19 @@ declare
     'select public.apply_price_adjustments(1)',
     'select * from public.storage_report()',
     'select * from public.latest_closes_before(current_date, current_date - 30)',
-    'select * from public.trading_days(current_date - 30)'
+    'select * from public.trading_days(current_date - 30)',
+    -- Phase 3 additions.
+    'insert into public.quality_issues (trade_date, check_name, severity, detail) values (current_date, ''test'', ''info'', ''test'')',
+    'select * from public.analytics_series(current_date - 30, array[1])',
+    'select public.score_forecasts(current_date)',
+    'select public.prune_analytics(120, 14)'
   ];
 begin
-  -- 1. Structure: 17 tables (15 from Phase 1, job_runs and price_adjustments
-  --    from Phase 2), each with row level security on and one read policy.
+  -- 1. Structure: 18 tables (15 from Phase 1, job_runs and price_adjustments
+  --    from Phase 2, quality_issues from Phase 3), each with row level security
+  --    on and one read policy.
   select count(*) into n from pg_tables where schemaname = 'public';
-  insert into check_results values ('17 tables exist', n = 17, n || ' found');
+  insert into check_results values ('18 tables exist', n = 18, n || ' found');
   select count(*) into n from pg_tables where schemaname = 'public' and not rowsecurity;
   insert into check_results values ('row level security is on everywhere', n = 0, n || ' tables without it');
   select count(*) into n from pg_policies where schemaname = 'public' and cmd <> 'SELECT';
@@ -45,10 +51,15 @@ begin
   select count(*) into n from public.job_runs;
   reset role;
   insert into check_results values ('public can read job_runs', true, n || ' job runs visible');
+  set local role anon;
+  select count(*) into n from public.latest_job_runs;
+  reset role;
+  insert into check_results values ('public can read the health view', true, n || ' jobs visible');
 
-  -- 3. The public role cannot write, or call the jobs' helper functions. Each attempt must be refused. If one is
-  --    ever allowed, the deliberate error right after it rolls the write back,
-  --    so this script can never change or delete real data.
+  -- 3. The public role cannot write, or call the jobs' helper functions. Each
+  --    attempt must be refused. If one is ever allowed, the deliberate error
+  --    right after it rolls the write back, so this script can never change or
+  --    delete real data.
   foreach attempt in array attempts loop
     begin
       set local role anon;
