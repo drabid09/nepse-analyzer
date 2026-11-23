@@ -1,0 +1,47 @@
+name: Watchdog
+
+# Checks that every job ran and the data is fresh. A failed check fails this
+# workflow, and GitHub emails the repository owner about failed scheduled runs
+# (Settings > Notifications > Actions). Times are UTC; Nepal is UTC+05:45.
+
+on:
+  schedule:
+    - cron: "20 5-12 * * 1-5"   # hourly, 11:05 to 18:05 Nepal time on weekdays
+    - cron: "40 2 * * *"        # 08:25 Nepal time every day, weekends included
+  workflow_dispatch:
+  push:
+    branches: ["phase-3/**"]
+    paths:
+      - "scripts/analytics/watchdog.py"
+      - ".github/workflows/watchdog.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: watchdog
+  cancel-in-progress: true
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      TZ: Asia/Kathmandu
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: scripts/analytics/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r scripts/analytics/requirements.txt
+
+      - name: Check jobs and data
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: python scripts/analytics/watchdog.py
