@@ -79,7 +79,13 @@ export function PriceChart({ bars, levels, intraday }: { bars: Bar[]; levels?: L
     import("lightweight-charts").then(({ createChart, CandlestickSeries, HistogramSeries, LineSeries, LineStyle }) => {
       if (cancelled || !el.current) return;
       const up = cssVar("--green"), down = cssVar("--red");
-      const c = createChart(el.current, { ...baseOptions(), handleScroll: true, handleScale: true, timeScale: { borderVisible: false, timeVisible: view === "today" } } as never);
+      // Drag sideways or pinch to explore; the mouse wheel and vertical swipes keep scrolling the page.
+      const c = createChart(el.current, {
+        ...baseOptions(),
+        handleScroll: { mouseWheel: false, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
+        handleScale: { mouseWheel: false, pinch: true, axisPressedMouseMove: true, axisDoubleClickReset: true },
+        timeScale: { borderVisible: false, timeVisible: view === "today" },
+      } as never);
       if (view === "today") {
         const s = c.addSeries(LineSeries, { color: cssVar("--blue"), lineWidth: 2, priceLineVisible: false } as never);
         const seen = new Set<number>();
