@@ -283,7 +283,9 @@ def gap_fill(db: Supabase, nepse: NepseSource, missing: list[dict], summary: dic
         for item in history:
             close = num(item.get("closePrice"))
             day = str(item.get("businessDate") or "")[:10]
-            if not close or len(day) != 10:
+            # NEPSE's history lists days without trades too, with the last price
+            # carried forward and zero quantity. Those are not trades: skip them.
+            if not close or len(day) != 10 or not whole(item.get("totalTradedQuantity")):
                 continue
             rows.append({
                 "company_id": company["id"], "date": day, "open": None,
