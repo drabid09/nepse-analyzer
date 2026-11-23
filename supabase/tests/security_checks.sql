@@ -29,18 +29,26 @@ declare
     'insert into public.quality_issues (trade_date, check_name, severity, detail) values (current_date, ''test'', ''info'', ''test'')',
     'select * from public.analytics_series(current_date - 30, array[1])',
     'select public.score_forecasts(current_date)',
-    'select public.prune_analytics(120, 14)'
+    'select public.prune_analytics(120, 14)',
+    -- Feedback: the public may send a message, but not read, change or delete any.
+    'select count(*) from public.feedback',
+    'update public.feedback set status = ''done''',
+    'delete from public.feedback',
+    'truncate public.feedback',
+    'insert into public.feedback (kind, message, status) values (''other'', ''security test'', ''done'')',
+    'select public.feedback_limit()'
   ];
 begin
-  -- 1. Structure: 18 tables (15 from Phase 1, job_runs and price_adjustments
-  --    from Phase 2, quality_issues from Phase 3), each with row level security
-  --    on and one read policy.
+  -- 1. Structure: 19 tables (15 from Phase 1, job_runs and price_adjustments
+  --    from Phase 2, quality_issues from Phase 3, feedback after launch), each
+  --    with row level security on.
   select count(*) into n from pg_tables where schemaname = 'public';
-  insert into check_results values ('18 tables exist', n = 18, n || ' found');
+  insert into check_results values ('19 tables exist', n = 19, n || ' found');
   select count(*) into n from pg_tables where schemaname = 'public' and not rowsecurity;
   insert into check_results values ('row level security is on everywhere', n = 0, n || ' tables without it');
-  select count(*) into n from pg_policies where schemaname = 'public' and cmd <> 'SELECT';
-  insert into check_results values ('no write policies exist', n = 0, n || ' write policies');
+  select count(*) into n from pg_policies
+  where schemaname = 'public' and cmd <> 'SELECT' and not (tablename = 'feedback' and cmd = 'INSERT');
+  insert into check_results values ('no write policies except sending feedback', n = 0, n || ' other write policies');
 
   -- 2. The public role can read.
   set local role anon;
@@ -75,7 +83,22 @@ begin
     end;
   end loop;
 
-  -- 4. Same for a signed-in (authenticated) visitor.
+  -- 4. The public can send a feedback message. The deliberate error right after
+  --    the insert rolls it back, so running this leaves no test message behind.
+  begin
+    set local role anon;
+    insert into public.feedback (kind, message) values ('other', 'security check, rolled back');
+    raise exception 'sent' using errcode = 'P0002';
+  exception
+    when sqlstate 'P0002' then
+      reset role;
+      insert into check_results values ('public can send feedback', true, 'insert of the message columns allowed');
+    when insufficient_privilege then
+      reset role;
+      insert into check_results values ('public can send feedback', false, 'REFUSED: the feedback form would not work');
+  end;
+
+  -- 5. Same for a signed-in (authenticated) visitor.
   begin
     set local role authenticated;
     delete from public.companies;
