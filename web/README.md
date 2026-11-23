@@ -28,7 +28,7 @@ Every query runs on the server with the Supabase project's publishable key, whic
 ```
 npm ci
 SUPABASE_URL=... SUPABASE_ANON_KEY=... npm run dev
-npm test            # freshness rules, formatting, key guard, Signals filters, symbols, index repair
+npm test            # freshness rules, refresh rhythm, breadth, formatting, key guard, Signals filters, search, symbols, index repair
 npm run typecheck
 ```
 
@@ -38,7 +38,11 @@ npm run typecheck
 production build in Chromium (Playwright): every page without console errors, the Signals chips
 left to right and back, rapid clicks, Back/refresh keeping filters, no background prefetch,
 invalid symbols, call-consistent levels, NEPSE change, Your stocks, layout shift, late jobs,
-the feedback form failing and double-clicked, the database down, search keys, phone width.
+the feedback form failing and double-clicked, the database down, search keys, phone width; and
+(second pass) a filter chosen just before opening a company, the Signals tab on a filtered table,
+fast typing in search on a throttled CPU, a double Enter, made-up symbols without a read, share
+breadth, flagged movers, feedback drafts across a refresh, a flaky database and a page that
+recovers by itself.
 
 ```
 node e2e/mock-postgrest.mjs &
