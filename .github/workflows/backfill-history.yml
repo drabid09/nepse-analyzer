@@ -1,0 +1,61 @@
+name: History backfill (one-time)
+
+# Imports daily prices from 2003 onward from the MIT-licensed
+# Aabishkar2/nepse-data repository (pinned commit), detects bonus and right
+# adjustments, then fills tradable companies without a CSV from NEPSE's own
+# one-year history. Safe to repeat: existing rows are never overwritten.
+# The NEPSE step waits for the session to end (it is skipped 10:15-15:15 Nepal
+# time on weekdays); run the workflow again after the close to do it.
+
+on:
+  workflow_dispatch:
+    inputs:
+      steps:
+        description: "Steps to run: csv, nepse, or csv,nepse"
+        default: "csv,nepse"
+  push:
+    branches: ["phase-2/**"]
+    paths:
+      - "scripts/ingest/backfill_history.py"
+      - ".github/workflows/backfill-history.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backfill-history
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      TZ: Asia/Kathmandu
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out the history dataset at a pinned commit
+        uses: actions/checkout@v4
+        with:
+          repository: Aabishkar2/nepse-data
+          ref: 29134e740b69053eb4541610037897a56cf24ede   # 20 Nov 2026, last trading day before Phase 2
+          path: dataset
+          sparse-checkout: data/company-wise
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: scripts/ingest/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r scripts/ingest/requirements.txt
+
+      - name: Import history
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          DATASET_DIR: dataset/data/company-wise
+          BACKFILL_STEPS: ${{ github.event.inputs.steps || 'csv,nepse' }}
+        run: python scripts/ingest/backfill_history.py

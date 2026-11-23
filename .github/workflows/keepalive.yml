@@ -1,0 +1,27 @@
+name: Keep schedules alive
+
+# GitHub disables scheduled workflows in a public repository after 60 days
+# without repository activity. Once a month this re-enables each scheduled
+# workflow through GitHub's API, which keeps them from lapsing while the
+# project is otherwise quiet. Any commit to the repository also resets the clock.
+
+on:
+  schedule:
+    - cron: "11 2 1 * *"   # 07:56 Nepal time on the 1st of each month
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  enable:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Re-enable scheduled workflows
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for wf in market-live.yml market-eod.yml company-details.yml sync-companies.yml analytics-daily.yml backtest-weekly.yml watchdog.yml keepalive.yml; do
+            gh api -X PUT "repos/${{ github.repository }}/actions/workflows/$wf/enable" && echo "enabled $wf"
+          done
