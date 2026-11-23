@@ -47,6 +47,32 @@ DEPLOY_TIMEOUT = 15 * 60  # seconds to wait for a new deployment
 DEPLOY_POLL = 20
 ERROR_MARKERS = ("Data temporarily unavailable", "Something went wrong", "Almost ready")
 HEADERS = {"x-content-type-options": "nosniff", "x-frame-options": "DENY", "referrer-policy": "strict-origin-when-cross-origin"}
+# Parts the Content-Security-Policy must contain, and what it must never allow.
+CSP_REQUIRED = ["default-src 'self'", "frame-ancestors 'none'", "object-src 'none'", "base-uri 'self'", "form-action 'self'"]
+CSP_FORBIDDEN = ["'unsafe-eval'", "*"]
+HSTS_MIN_SECONDS = 31_536_000
+
+
+def header_problems(path: str, headers) -> list[str]:
+    """Security headers: the exact ones, a strict enough CSP, a year of HSTS, a permissions policy."""
+    out = [f"{path}: header {name} is {headers.get(name)!r}, expected {value!r}"
+           for name, value in HEADERS.items() if headers.get(name) != value]
+    csp = headers.get("content-security-policy") or ""
+    if not csp:
+        out.append(f"{path}: no Content-Security-Policy")
+    else:
+        out += [f"{path}: CSP lacks {part}" for part in CSP_REQUIRED if part not in csp]
+        out += [f"{path}: CSP allows {bad}" for bad in CSP_FORBIDDEN if f" {bad}" in f" {csp}".replace(";", " ")]
+    hsts = headers.get("strict-transport-security") or ""
+    try:
+        seconds = int(hsts.split("max-age=")[1].split(";")[0]) if "max-age=" in hsts else 0
+    except ValueError:
+        seconds = 0
+    if seconds < HSTS_MIN_SECONDS:
+        out.append(f"{path}: Strict-Transport-Security is {hsts!r}, expected at least a year")
+    if not headers.get("permissions-policy"):
+        out.append(f"{path}: no Permissions-Policy")
+    return out
 
 
 # ---------------------------------------------------------------- formatting, as the website does it
@@ -149,9 +175,9 @@ def expected(db: Supabase) -> dict:
     index = db.select("index_daily", select="date,close", index_id=f"eq.{NEPSE_INDEX_ID}", order="date.desc", limit=1)
     if not (final and sig_day and price_day and index):
         raise JobError("the database has no final day, signals, prices or NEPSE index yet")
-    signals = db.select_all("signals", select="company_id", date=f"eq.{sig_day[0]['date']}", order="company_id")
-    prices = db.select_all("daily_prices", select="company_id,close", date=f"eq.{price_day[0]['date']}", order="company_id")
-    symbols = {c["id"]: c["symbol"] for c in db.select_all("companies", select="id,symbol", order="id")}
+    signals = db.select_all("signals", select="company_id", date=f"eq.{sig_day[0]['date']}")
+    prices = db.select_all("daily_prices", select="company_id,close", date=f"eq.{price_day[0]['date']}")
+    symbols = {c["id"]: c["symbol"] for c in db.select_all("companies", select="id,symbol")}
     with_signal = {s["company_id"] for s in signals}
     priced = sorted((symbols[p["company_id"]], float(p["close"])) for p in prices
                     if p["company_id"] in with_signal and p["company_id"] in symbols)
@@ -184,9 +210,7 @@ def check(db: Supabase, client: httpx.Client) -> tuple[list[str], list[str], dic
                 problems.append(f"{path}: shows '{marker}'")
         if "sb_secret_" in page.html or (secret and secret in page.html):
             problems.append(f"{path}: a secret key appears in the page")
-        for name, value in HEADERS.items():
-            if page.headers.get(name) != value:
-                problems.append(f"{path}: header {name} is {page.headers.get(name)!r}, expected {value!r}")
+        problems += header_problems(path, page.headers)
 
     health, market, signals = pages["/health"], pages["/"], pages["/signals"]
     if not any(f"Latest final trading day: {d}" in health.text for d in nepali_days(exp["final_day"])):
