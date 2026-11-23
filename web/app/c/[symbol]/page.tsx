@@ -9,6 +9,13 @@ import { configured } from "@/lib/db";
 import { change, day, num, pct, price, rupees, whole } from "@/lib/format";
 
 export const revalidate = 60;
+// Company pages are rendered on first visit and then served from Vercel's cache like the
+// other pages, so a page left open (it refreshes every minute in trading hours) costs a
+// cache read, not a fresh render and database reads each time.
+export const dynamicParams = true;
+export function generateStaticParams() {
+  return [];
+}
 
 type Props = { params: Promise<{ symbol: string }> };
 
@@ -40,12 +47,11 @@ function since(days: number) {
 
 async function Company({ company }: { company: data.Company }) {
   const id = company.id;
-  const [c, prices, signals, backtests, floor, adjustments, issueRows] = await Promise.all([
-    data.companies(), data.companyPrices(id, since(1150)), data.companySignals(id, 30), data.companyBacktests(id),
+  const [c, prices, signal, history, backtests, floor, adjustments, issueRows] = await Promise.all([
+    data.companies(), data.companyPrices(id, since(1150)), data.companySignal(id), data.companyCallHistory(id, 12), data.companyBacktests(id),
     data.companyFloorsheet(id), data.companyAdjustments(id), data.issues({ company_id: `eq.${id}` }, 10),
   ]);
   const last = prices.at(-1);
-  const signal = signals[0];
   const [forecasts, intraday] = await Promise.all([
     signal ? data.companyForecasts(id, signal.date) : Promise.resolve([]),
     last && !last.is_final ? data.companyIntraday(id, `${last.date}T00:00:00+05:45`) : Promise.resolve([]),
@@ -76,7 +82,7 @@ async function Company({ company }: { company: data.Company }) {
       </div>
 
       <Card>
-        {bars.length ? <PriceChart bars={bars} intraday={intraday} levels={showLevels ? signal : undefined} /> : <Empty>No price history.</Empty>}
+        {bars.length ? <PriceChart bars={bars} intraday={intraday} levels={showLevels && signal ? signal : undefined} /> : <Empty>No price history.</Empty>}
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
@@ -199,11 +205,11 @@ async function Company({ company }: { company: data.Company }) {
               <dt className="text-muted">3 months vs its sector</dt><dd className="num">{signal.rel_strength_sector !== null ? pct(num(signal.rel_strength_sector)! * 100, 1) : "—"}</dd>
             </dl>
           ) : <Empty>No indicators yet.</Empty>}
-          {signals.length > 1 ? (
+          {history.length > 1 ? (
             <div className="mt-5">
               <div className="text-[12px] text-muted uppercase tracking-wide mb-2">Recent calls</div>
               <div className="flex flex-wrap gap-1.5">
-                {signals.slice(0, 12).reverse().map((s) => (
+                {history.slice(0, 12).reverse().map((s) => (
                   <span key={s.date} title={`${day(s.date)}: ${s.recommendation}, score ${s.score}`}><CallBadge call={s.recommendation} dataOk={s.data_ok} /></span>
                 ))}
               </div>
