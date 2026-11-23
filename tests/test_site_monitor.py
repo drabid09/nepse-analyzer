@@ -47,6 +47,8 @@ def site(overrides: dict | None = None, headers: dict | None = None):
                     "<tr><td>BBB</td><td>99.90</td></tr><tr><td>CCC</td><td>15,000.00</td></tr></table>",
         "/track-record": "<h1>Track record</h1>",
         "/health": "<p>Latest final trading day: <span>Fri, 20 Nov 2026</span></p>",
+        "/guide": "<h1>How to read your dashboard</h1>",
+        "/feedback": "<form><label>Your message</label><textarea></textarea></form>",
         "/c/AAA": "<h1>AAA</h1><div>1,234.50</div><script>self.__next_f.push('not visible')</script>",
     }
     pages.update(overrides or {})
@@ -117,4 +119,9 @@ def test_reads_the_commit_from_the_page():
 def test_gives_up_when_the_deployment_never_arrives(monkeypatch):
     monkeypatch.setattr(sm, "served_commit", lambda client: "old")
     assert sm.wait_for_commit(None, "new", timeout=0, poll=1) == (False, "old")
+
+
+def test_a_missing_feedback_form_is_caught():
+    problems, _, _ = sm.check(db(), site({"/feedback": "<h1>Tell Drabid</h1>"}))
+    assert "/feedback: the feedback form is missing" in problems
 
