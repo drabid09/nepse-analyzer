@@ -5,9 +5,11 @@ NEPSE's company detail call gives ISIN, listing date, face value, listed
 shares, paid-up capital, market capitalisation and the promoter/public split,
 one company per request. Asking for all ~540 tradable companies at once would
 be a burst far above the load planned in Phase 0, so each run refreshes the
-BATCH companies checked longest ago (never-checked first), with a pause
-between requests. Run daily after the close, every company is refreshed about
-once a week.
+BATCH companies checked longest ago (never-checked first, ordinary shares before
+debentures, funds and promoter shares, because those are the pages people open),
+with a pause between requests. Run daily after the close, every company is
+refreshed about once a week. A run started by hand can take a larger batch
+(DETAILS_BATCH, at most MAX_BATCH) to catch up, at the same pace.
 
 Only columns this job knows about are touched.
 """
@@ -23,7 +25,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import JobError, JobRun, NepseSource, Supabase, now_npt, num, run, whole, write_summary  # noqa: E402
 
-BATCH = int(os.environ.get("DETAILS_BATCH", "110"))
+MAX_BATCH = 600
+BATCH = max(1, min(MAX_BATCH, int(os.environ.get("DETAILS_BATCH") or "110")))
 PAUSE = 3.0
 QUIET_FROM, QUIET_UNTIL = time(10, 15), time(15, 15)   # not during the session
 
@@ -33,14 +36,23 @@ def pct(value) -> float | None:
     return result if result is not None and 0 <= result <= 100 else None
 
 
+def due_companies(db: Supabase, batch: int) -> list[dict]:
+    """Never-checked ordinary shares first, then everything else by when it was last checked."""
+    first = db.select("companies", select="id,symbol,name", is_tradable="eq.true", instrument_type="eq.Equity",
+                      details_checked_at="is.null", order="id.asc", limit=batch)
+    rest = db.select("companies", select="id,symbol,name", is_tradable="eq.true",
+                     order="details_checked_at.asc.nullsfirst,id.asc", limit=batch) if len(first) < batch else []
+    taken = {c["id"] for c in first}
+    return (first + [c for c in rest if c["id"] not in taken])[:batch]
+
+
 def main() -> None:
     now = now_npt()
     if now.weekday() < 5 and QUIET_FROM <= now.time() < QUIET_UNTIL:
         print(f"{now:%H:%M} is during the trading session. Company details run after {QUIET_UNTIL:%H:%M}.")
         return
     db = Supabase()
-    due = db.select("companies", select="id,symbol,name", is_tradable="eq.true",
-                    order="details_checked_at.asc.nullsfirst,id.asc", limit=BATCH)
+    due = due_companies(db, BATCH)
     if not due:
         print("No tradable companies.")
         return

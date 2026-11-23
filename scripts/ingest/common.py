@@ -293,6 +293,48 @@ def company_maps(db: Supabase) -> tuple[dict[str, int], dict[str, int]]:
     return by_security, by_symbol
 
 
+def share_ids(db: Supabase) -> set[int]:
+    """Company ids of ordinary shares (NEPSE instrument type "Equity"): the companies NEPSE's
+    market breadth counts. On 23 Nov 2026 that was 280 companies, against 360 traded
+    securities once debentures, mutual funds and promoter shares are included."""
+    rows = db.select_all("companies", select="id", instrument_type="eq.Equity", order="id")
+    return {r["id"] for r in rows}
+
+
+def breadth(rows: list[dict], shares: set[int]) -> dict:
+    """Rising, falling and unchanged ordinary shares, by NEPSE's own day change.
+
+    NEPSE's day change (percentageChange) compares the last trade with the previous close,
+    while the closing price it publishes can differ from the last trade (NHPC on 23 Nov 2026:
+    close 249.60, last trade 250.00 on ShareHub). Counting by closing price gave 106 rising
+    and 9 unchanged where the news reported 105 and 10. Each row is judged by NEPSE's
+    percentage change if given, else its last traded price, else its closing price; the
+    end-of-day summary lists the shares where the two disagree, so the basis can be checked.
+
+    rows: dicts with company_id, close, prev_close and optionally symbol, ltp, change.
+    Returns the three counts and "differs": the shares whose closing price tells another story.
+    """
+    up = down = same = 0
+    differs: list[str] = []
+    for r in rows:
+        if r.get("company_id") not in shares:
+            continue
+        prev, close, ltp, change = r.get("prev_close"), r.get("close"), r.get("ltp"), r.get("change")
+        if change is None:
+            basis = ltp if ltp is not None else close
+            if basis is None or not prev:
+                continue
+            change = basis - prev
+        sign = (change > 0) - (change < 0)
+        up += sign > 0
+        down += sign < 0
+        same += sign == 0
+        if close is not None and prev:
+            if ((close > prev) - (close < prev)) != sign:
+                differs.append(f"{r.get('symbol') or r['company_id']} (close {close}, last trade {ltp}, previous {prev})")
+    return {"advancers": up, "decliners": down, "unchanged": same, "differs": differs}
+
+
 def lookup_company(row: dict, by_security: dict[str, int], by_symbol: dict[str, int]) -> int | None:
     security = row.get("securityId", row.get("stockId"))
     if security is not None and str(security) in by_security:

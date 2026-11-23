@@ -34,8 +34,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import (  # noqa: E402
-    NPT, JobError, JobRun, NepseSource, Supabase, company_maps, lookup_company,
-    now_npt, num, previous_index_closes, run, settle_index_prev_close, started_by_hand, whole, write_summary,
+    NPT, JobError, JobRun, NepseSource, Supabase, breadth, company_maps, lookup_company,
+    now_npt, num, previous_index_closes, run, settle_index_prev_close, share_ids, started_by_hand, whole, write_summary,
 )
 from live_market import parse_npt, summary_fields  # noqa: E402
 import sharesansar  # noqa: E402
@@ -179,6 +179,8 @@ def rows_from_live(live: list[dict], closes: list[dict], trade_date: date) -> li
             "close": close_by_symbol.get(str(r.get("symbol")).upper()) or num(r.get("lastTradedPrice")),
             "prev_close": num(r.get("previousClose")), "volume": whole(r.get("totalTradeQuantity")) or 0,
             "turnover": num(r.get("totalTradeValue")), "trades": None,
+            # NEPSE's own day change (last trade against the previous close): the basis of market breadth.
+            "ltp": num(r.get("lastTradedPrice")), "change": num(r.get("percentageChange")),
         })
     return out
 
@@ -216,6 +218,7 @@ def rows_from_today_price(nepse: NepseSource, trade_date: date) -> tuple[list[di
             "volume": whole(first_of(r, "totalTradedQuantity", "totalTradeQuantity")) or 0,
             "turnover": num(first_of(r, "totalTradedValue", "totalTradeValue")),
             "trades": whole(first_of(r, "totalTrades")),
+            "ltp": num(first_of(r, "lastTradedPrice")), "change": num(first_of(r, "percentageChange")),
         })
     return out, {"pages": pages, "rows": len(items), "fields": shape}
 
@@ -439,9 +442,8 @@ def sharesansar_only(db: Supabase, nepse_error: JobError, forced: bool) -> None:
         for event in events:
             if event["status"] == "confirmed":
                 db.rpc("apply_price_adjustments", {"p_company_id": event["company_id"]})
-    up = sum(p["close"] > p["prev_close"] for p in prices if p["prev_close"])
-    down = sum(p["close"] < p["prev_close"] for p in prices if p["prev_close"])
-    same = sum(p["close"] == p["prev_close"] for p in prices if p["prev_close"])
+    counts = breadth(prices, share_ids(db))  # Sharesansar has no day change field: closing prices
+    up, down, same = counts["advancers"], counts["decliners"], counts["unchanged"]
     written += db.upsert("market_daily", [{
         "date": as_of.isoformat(), "turnover": round(sum(p["turnover"] or 0 for p in prices), 2),
         "traded_shares": sum(p["volume"] for p in prices), "transactions": sum(p["trades"] or 0 for p in prices),
@@ -471,8 +473,7 @@ def finalise(db: Supabase, nepse: NepseSource, run_log: JobRun, trade_date: date
     except JobError as exc:
         problems.append(f"floorsheet not stored: {exc}")
 
-    prices, volume_mismatch = [], []
-    advancers = decliners = unchanged = 0
+    prices, volume_mismatch, moves = [], [], []
     for r in source_rows:
         company_id = lookup_company(r, by_security, by_symbol)
         volume, close = r["volume"], r["close"]
@@ -482,10 +483,8 @@ def finalise(db: Supabase, nepse: NepseSource, run_log: JobRun, trade_date: date
         floor = trades_by_company.get(company_id)
         if floor and floor["quantity"] != volume:
             volume_mismatch.append(company_id)
-        if prev:
-            advancers += close > prev
-            decliners += close < prev
-            unchanged += close == prev
+        moves.append({"company_id": company_id, "symbol": r.get("symbol"), "close": close, "prev_close": prev,
+                      "ltp": r.get("ltp"), "change": r.get("change")})
         prices.append({
             "company_id": company_id, "date": trade_date.isoformat(),
             "open": r["open"], "high": r["high"], "low": r["low"],
@@ -528,6 +527,9 @@ def finalise(db: Supabase, nepse: NepseSource, run_log: JobRun, trade_date: date
     # Only a day with NEPSE prices and a floorsheet counts as final; otherwise the
     # backup runs try again later the same day.
     complete = price_info["price_source"] == "nepse" and bool(floor_rows)
+    # Breadth over ordinary shares by NEPSE's own day change (common.breadth).
+    counts = breadth(moves, share_ids(db))
+    advancers, decliners, unchanged = counts["advancers"], counts["decliners"], counts["unchanged"]
     market = {"date": trade_date.isoformat(), "advancers": advancers, "decliners": decliners,
               "unchanged": unchanged, "is_final": complete, **summary}
     written += db.upsert("market_daily", [market], on_conflict="date")
@@ -546,6 +548,7 @@ def finalise(db: Supabase, nepse: NepseSource, run_log: JobRun, trade_date: date
         "indices": len(index_days), "index_graph_points": sum(len(p) for p in index_points.values()),
         "adjustments": {"confirmed": len(confirmed), "unconfirmed": len(events) - len(confirmed), "rows_adjusted": adjusted_rows},
         "rows_removed_by_retention": removed, "storage": space, "problems": problems[:10],
+        "breadth": {"advancers": advancers, "decliners": decliners, "unchanged": unchanged, "close_differs": counts["differs"][:20]},
     }
     status_word = "ok" if not problems else "partial"
     message = f"{trade_date}: {len(prices)} prices, {len(floor_rows)} floorsheet summaries, {len(index_days)} indices"
@@ -554,7 +557,9 @@ def finalise(db: Supabase, nepse: NepseSource, run_log: JobRun, trade_date: date
     write_summary("\n".join([
         f"## End of day {trade_date}",
         "",
-        f"- **{len(prices)} traded securities** finalised from NEPSE's {price_info['source']} list; advancers {advancers}, decliners {decliners}, unchanged {unchanged}.",
+        f"- **{len(prices)} traded securities** finalised from NEPSE's {price_info['source']} list.",
+        f"- Ordinary shares by NEPSE's day change: {advancers} rising, {decliners} falling, {unchanged} unchanged"
+        f" ({advancers + decliners + unchanged} companies). Closing price tells another story for: {'; '.join(counts['differs']) or 'none'}.",
         f"- Floorsheet: {floor_info.get('fetched_trades', 0)} trades in {floor_info.get('pages', 0)} pages "
         f"(NEPSE reported {floor_info.get('reported_trades')}), summarised for {len(floor_rows)} companies.",
         f"- Indices: {len(index_days)} final, {details['index_graph_points']} intraday graph points.",
