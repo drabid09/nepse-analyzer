@@ -106,7 +106,7 @@ def check_data(db: Supabase, trade_date: date, companies: list[dict], issues: Is
 
     market = db.select("market_daily", select="scrips_traded,is_final", date=f"eq.{day}")
     rows = db.select_all("daily_prices", select="company_id,open,high,low,close,prev_close,volume,source",
-                         date=f"eq.{day}", is_final="eq.true")
+                         date=f"eq.{day}", is_final="eq.true", order="company_id")
     facts["rows_on_day"] = len(rows)
     expected = market[0]["scrips_traded"] if market else None
     facts["scrips_traded_reported"] = expected
@@ -193,7 +193,7 @@ def check_freshness(db: Supabase, trade_date: date, issues: Issues) -> None:
 
 def backtest_lookup(db: Supabase) -> tuple[dict, dict]:
     rows = db.select_all("backtest_results", select="company_id,kind,name,variant,sample_size,hit_rate,mae_pct,band_coverage_pct,reliable",
-                         company_id="not.is.null")
+                         company_id="not.is.null", order="company_id,kind,name,variant")
     forecast, strategy = {}, {}
     for r in rows:
         if r["kind"] == "forecast":
@@ -380,13 +380,18 @@ def analyse(db: Supabase, trade_date: date, issues: Issues) -> dict:
                 "reliable": reliable, "note": note,
             })
 
-    written = db.upsert("signals", signals, on_conflict="company_id,date")
+    # Ranges first, calls last: the website switches to a new day as soon as its signals
+    # appear, so the day's ranges must already be complete by then. The signals go in one
+    # request (one transaction), so the website never sees half a day of calls.
+    written = 0
     if forecasts:
         written += db.upsert("forecasts", forecasts, on_conflict="company_id,made_on,horizon,model")
+    written += db.upsert("signals", signals, on_conflict="company_id,date", batch=max(len(signals), 1))
     scored = int(db.rpc("score_forecasts", {"p_date": trade_date.isoformat()}) or 0)
     pruned = int(db.rpc("prune_analytics", {}) or 0)
 
-    track = db.select_all("forecasts", select="horizon,low,high,actual_close", model="eq.ensemble", actual_close="not.is.null")
+    track = db.select_all("forecasts", select="horizon,low,high,actual_close", model="eq.ensemble", actual_close="not.is.null",
+                          order="company_id,made_on,horizon")
     live_record = {}
     for horizon in engine.HORIZONS:
         done = [t for t in track if t["horizon"] == horizon]
