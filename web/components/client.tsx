@@ -7,25 +7,44 @@ import { ago } from "@/lib/format";
 import { companyHref } from "@/lib/symbol";
 
 /**
- * Keeps an open page current: re-reads it from the server every minute during trading hours and
- * every 10 minutes otherwise, and straight away when the copy on screen is older than 90 seconds.
- * That happens on the first visit after a quiet spell (pages are served from a cache while a fresh
- * copy is made), when coming back to a tab or phone after a while, and after moving between pages.
+ * Keeps an open page current: re-reads it from the server every minute during trading hours (and
+ * while the database is not answering) and every 10 minutes otherwise, and when coming back to the
+ * tab or phone after a while.
+ *
+ * Pages are served from a cache that hands out the previous copy while it makes a new one. So when
+ * a copy older than 90 seconds arrives (the first visit after a quiet spell, coming back to a tab,
+ * moving between pages), it asks again shortly, up to 3 times in a row, to get the new copy.
  */
 export function AutoRefresh({ open, renderedAt }: { open: boolean; renderedAt: string }) {
   const router = useRouter();
   const path = usePathname();
   const lastRefresh = useRef(0);
+  const retries = useRef(0);
+
+  useEffect(() => {
+    const age = Date.now() - (Date.parse(renderedAt) || 0);
+    if (age <= 90_000) {
+      retries.current = 0;
+      return;
+    }
+    if (retries.current >= 3 || document.visibilityState !== "visible") return;
+    const id = setTimeout(() => {
+      retries.current += 1;
+      lastRefresh.current = Date.now();
+      router.refresh();
+    }, retries.current === 0 ? 0 : 5_000);
+    return () => clearTimeout(id);
+  }, [renderedAt, path, router]);
 
   useEffect(() => {
     const refreshIfOld = (limit: number) => {
       const shown = Math.max(Date.parse(renderedAt) || 0, lastRefresh.current);
       if (document.visibilityState === "visible" && Date.now() - shown > limit) {
         lastRefresh.current = Date.now();
+        retries.current = 0;
         router.refresh();
       }
     };
-    refreshIfOld(90_000);
     const id = setInterval(() => refreshIfOld(open ? 55_000 : 590_000), 15_000);
     const onVisible = () => refreshIfOld(60_000);
     document.addEventListener("visibilitychange", onVisible);
@@ -33,8 +52,30 @@ export function AutoRefresh({ open, renderedAt }: { open: boolean; renderedAt: s
       clearInterval(id);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [open, renderedAt, path, router]);
+  }, [open, renderedAt, router]);
   return null;
+}
+
+/**
+ * A visible note when the copy on screen is old and refreshing has not replaced it, which is
+ * what happens if the database stops answering: the last good page keeps being served. Shown
+ * only after the page has had 30 seconds to refresh itself, so a normal visit never flashes it.
+ */
+export function StaleNotice({ renderedAt }: { renderedAt: string }) {
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    const start = Date.now();
+    const id = setInterval(() => setNow(Date.now() - start > 30_000 ? Date.now() : null), 5_000);
+    return () => clearInterval(id);
+  }, [renderedAt]);
+  const age = now === null ? 0 : now - Date.parse(renderedAt);
+  if (!(age > 15 * 60_000)) return null;
+  return (
+    <div role="status" className="rounded-2xl px-4 py-3 mb-6 text-[14px] bg-warn-soft text-warn">
+      This page is from {new Date(renderedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kathmandu" })} ({ago(renderedAt)}):
+      newer data could not be loaded. It keeps trying by itself.
+    </div>
+  );
 }
 
 /** "5 min ago" from the visitor's own clock, so a cached page never claims to be newer than it is. */
