@@ -34,3 +34,22 @@ test("one visitor may send a few messages, then waits", () => {
   assert.equal(allowSend(log, "5.6.7.8", 2000), true); // someone else is not affected
   assert.equal(allowSend(log, "1.2.3.4", 1000 + SEND_WINDOW_MS + 10), true); // the window slides
 });
+
+test("control characters are removed instead of making the save fail", () => {
+  const c = checkFeedback({ kind: "idea", message: "nul \u0000 bell \u0007 ok\r\nnext line", about: "NABIL\u0000" }, "S");
+  assert.ok(c.ok && c.row);
+  assert.equal(c.row.message, "nul  bell  ok\nnext line");
+  assert.equal(c.row.page, "NABIL");
+});
+
+test("lengths count characters as the database does", () => {
+  assert.equal(checkFeedback({ kind: "idea", message: "😀😀" }, "S").ok, false); // 2 characters; JavaScript counts 4
+  assert.equal(checkFeedback({ kind: "idea", message: "😀".repeat(4000) }, "S").ok, true);
+  const about = checkFeedback({ kind: "idea", message: "hello", about: "😀".repeat(300) }, "S");
+  assert.ok(about.ok && about.row && [...about.row.page!].length === 200);
+});
+
+test("an unpaired surrogate half is dropped", () => {
+  const c = checkFeedback({ kind: "other", message: "abc\uD800def" }, "S");
+  assert.ok(c.ok && c.row && c.row.message === "abcdef");
+});

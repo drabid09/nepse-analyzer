@@ -34,7 +34,8 @@ export default async function CompanyPage({ params }: Props) {
   const symbol = parseSymbol(segment);
   if (!symbol) notFound();
   // One address per company: /c/nabil becomes /c/NABIL instead of a second cached copy.
-  if (segment !== symbol) redirect(companyHref(symbol));
+  // Another spelling (lower case, an unencoded slash) goes to the one canonical address.
+  if (`/c/${segment}` !== companyHref(symbol)) redirect(companyHref(symbol));
   let company: data.Company | null;
   try {
     company = await data.companyBySymbol(symbol);

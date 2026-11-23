@@ -68,6 +68,10 @@ begin
   select count(*) into n from public.latest_job_runs;
   reset role;
   insert into check_results values ('public can read the health view', true, n || ' jobs visible');
+  set local role anon;
+  select count(*) into n from public.forecast_live_record;
+  reset role;
+  insert into check_results values ('public can read the live range record', true, n || ' horizons visible');
 
   -- 3. The public role cannot write, or call the jobs' helper functions. Each
   --    attempt must be refused. If one is ever allowed, the deliberate error

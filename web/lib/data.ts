@@ -183,5 +183,11 @@ export const issues = (filters: Record<string, string> = {}, limit = 50) =>
   rest<Issue>("quality_issues", { select: "*", order: "trade_date.desc,severity", limit, ...filters });
 export const recentRuns = (limit = 40) =>
   rest<JobRun>("job_runs", { select: "id,job,trade_date,status,started_at,heartbeat_at,finished_at,run_url,requests,rows_written,message", order: "started_at.desc", limit });
-export const scoredForecasts = () =>
-  rest<Pick<Forecast, "horizon" | "low" | "high" | "mid" | "actual_close" | "made_on">>("forecasts", { select: "horizon,low,mid,high,actual_close,made_on", model: "eq.ensemble", actual_close: "not.is.null", order: "company_id,made_on,horizon" }, { revalidate: HOUR, all: true });
+/**
+ * How the published ranges are doing: one row per horizon, counted in the database (view
+ * forecast_live_record). About 780 ranges are published each trading day; downloading every
+ * checked one would grow to tens of MB per read within a year and exhaust the free plan's
+ * monthly data transfer. This read stays a few bytes.
+ */
+export const liveRecord = () =>
+  rest<{ horizon: string; checked: number; inside: number }>("forecast_live_record", { select: "horizon,checked,inside", order: "horizon" }, { revalidate: HOUR });

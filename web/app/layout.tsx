@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import "./globals.css";
-import { AutoRefresh, Nav, SearchBox } from "@/components/client";
+import { AutoRefresh, Nav, SearchBox, StaleNotice } from "@/components/client";
 import { HealthBanner, SessionPill } from "@/components/HealthBanner";
 import { companies, health } from "@/lib/data";
 import { configured } from "@/lib/db";
@@ -26,20 +26,22 @@ export const viewport: Viewport = {
 export const revalidate = 60;
 
 async function chrome() {
-  if (!configured()) return null;
+  if (!configured()) return { data: null, failed: false };
   try {
     const [c, h] = await Promise.all([companies(), health()]);
     const list = c.list.filter((x) => x.instrument_type === "Equity" || x.is_tradable).map((x) => ({ symbol: x.symbol, name: x.name }));
-    return { list, f: freshness(h.runs, h.latestFinal, h.marketErrors, new Date(), h.signalDate), renderedAt: new Date().toISOString() };
+    return { data: { list, f: freshness(h.runs, h.latestFinal, h.marketErrors, new Date(), h.signalDate) }, failed: false };
   } catch (error) {
-    // The header is optional: without it each page still shows its own data or its own error.
+    // Each page still shows its own data or its own error, but the freshness checks did not
+    // run, so the page says so (below) instead of silently dropping every warning.
     console.error("header data unavailable:", error instanceof Error ? error.message : error);
-    return null;
+    return { data: null, failed: true };
   }
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const data = await chrome();
+  const { data, failed } = await chrome();
+  const renderedAt = new Date().toISOString();
   return (
     <html lang="en">
       <body className="min-h-screen">
@@ -61,7 +63,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           {data ? (
             <div className="hidden sm:flex justify-end -mt-4 mb-4"><SessionPill f={data.f} /></div>
           ) : null}
+          {data || failed ? <StaleNotice renderedAt={renderedAt} /> : null}
           {data ? <HealthBanner f={data.f} /> : null}
+          {failed ? (
+            <div role="status" className="rounded-2xl px-4 py-3 mb-6 text-[14px] bg-warn-soft text-warn">
+              The data&apos;s freshness could not be checked just now, so what follows may be out of date. The page tries again by itself.
+            </div>
+          ) : null}
           {children}
         </main>
         <footer className="mx-auto max-w-[1120px] px-4 sm:px-6 pb-12 pt-4 text-[12px] leading-relaxed text-faint space-y-3">
@@ -76,7 +84,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             Sharesansar. Times are Nepal time.
           </p>
         </footer>
-        {data ? <AutoRefresh open={data.f.session === "open"} renderedAt={data.renderedAt} /> : null}
+        {data || failed ? <AutoRefresh open={failed || data?.f.session === "open"} renderedAt={renderedAt} /> : null}
       </body>
     </html>
   );

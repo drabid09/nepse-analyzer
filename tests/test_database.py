@@ -205,3 +205,19 @@ def test_timer_plan_has_every_workflow_once_per_time(timer_db):
                           "company-details.yml": 1, "feedback-notify.yml": 1, "keepalive.yml": 1,
                           "market-eod.yml": 3, "market-live.yml": 3, "site-monitor.yml": 2,
                           "sync-companies.yml": 1, "watchdog.yml": 2}
+
+
+def test_forecast_live_record_counts_in_the_database(conn):
+    cid = conn.execute("insert into companies (symbol, name) values ('RECCO', 'Record test') returning id").fetchone()[0]
+    rows = [("2026-01-05", "1W", 90, 110, 100), ("2026-01-06", "1W", 90, 110, 120), ("2026-01-05", "1M", 80, 120, 100),
+            ("2026-01-07", "1W", 90, 110, None)]
+    for made_on, horizon, low, high, actual in rows:
+        conn.execute("""insert into forecasts (company_id, made_on, horizon, model, target_date, base_close, low, mid, high, band_pct, reliable, actual_close)
+                        values (%s, %s, %s, 'ensemble', %s::date + 7, 100, %s, 100, %s, 20, true, %s)""", (cid, made_on, horizon, made_on, low, high, actual))
+    conn.execute("set role anon")
+    try:
+        got = {h: (c, i) for h, c, i in conn.execute("select horizon, checked, inside from forecast_live_record where horizon in ('1W', '1M')").fetchall()}
+    finally:
+        conn.execute("reset role")
+    assert got["1W"] == (2, 1)     # one inside, one outside; the unchecked one is not counted
+    assert got["1M"] == (1, 1)
