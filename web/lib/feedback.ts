@@ -16,15 +16,32 @@ export const ABOUT_MAX = 200;
 export type FeedbackRow = { kind: Kind; message: string; page: string | null; name: string };
 export type Checked = { ok: true; spam: boolean; row: FeedbackRow | null } | { ok: false; error: string };
 
+/**
+ * Text as the database can store it: no NUL or other control characters (Postgres refuses
+ * NUL outright, so the message would fail to send), no unpaired surrogate halves, and
+ * Windows line endings made plain.
+ */
+export function cleanText(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value
+    .replace(/\r\n?/g, "\n")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
+    .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "")
+    .trim();
+}
+
+/** Length in characters as the database counts them (an emoji is one, not two). */
+const chars = (s: string) => [...s].length;
+
 export function checkFeedback(input: { kind: unknown; message: unknown; about?: unknown; website?: unknown }, name: string): Checked {
   // "website" is a field people never see; automated form fillers do. Pretend success, save nothing.
   if (typeof input.website === "string" && input.website.trim() !== "") return { ok: true, spam: true, row: null };
   const kind = KINDS.find((k) => k.id === input.kind)?.id;
   if (!kind) return { ok: false, error: "Choose what kind of message this is." };
-  const message = typeof input.message === "string" ? input.message.trim() : "";
-  if (message.length < MESSAGE_MIN) return { ok: false, error: "Write a few words first." };
-  if (message.length > MESSAGE_MAX) return { ok: false, error: `Please keep it under ${MESSAGE_MAX.toLocaleString("en-IN")} characters.` };
-  const about = typeof input.about === "string" ? input.about.trim().slice(0, ABOUT_MAX) : "";
+  const message = cleanText(input.message);
+  if (chars(message) < MESSAGE_MIN) return { ok: false, error: "Write a few words first." };
+  if (chars(message) > MESSAGE_MAX) return { ok: false, error: `Please keep it under ${MESSAGE_MAX.toLocaleString("en-IN")} characters.` };
+  const about = [...cleanText(input.about)].slice(0, ABOUT_MAX).join("").trim();
   return { ok: true, spam: false, row: { kind, message, page: about || null, name } };
 }
 

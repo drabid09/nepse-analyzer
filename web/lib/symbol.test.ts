@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { companyHref, parseSymbol } from "./symbol.ts";
+import { companyHref, normalizeSymbol, parseSymbol } from "./symbol.ts";
 
 test("symbols are upper-cased and checked", () => {
   assert.equal(parseSymbol("NABIL"), "NABIL");
@@ -22,4 +22,16 @@ test("anything that cannot be a symbol is refused before a database read", () =>
 test("company links are encoded", () => {
   assert.equal(companyHref("NABIL"), "/c/NABIL");
   assert.equal(companyHref("A/B?x"), "/c/A%2FB%3Fx");
+});
+
+test("debentures keep their slash, inside one path segment", () => {
+  assert.equal(parseSymbol("GBD80%2F81"), "GBD80/81");
+  assert.equal(parseSymbol("gbd80%2f81"), "GBD80/81");
+  assert.equal(companyHref("GBD80/81"), "/c/GBD80%2F81");
+  assert.equal(normalizeSymbol(" nifraur85/86 "), "NIFRAUR85/86");
+});
+
+test("control characters, path tricks and very long segments are refused", () => {
+  for (const bad of ["NABIL%00", "..%2F..%2Fetc", "%2FNABIL", "A".repeat(300), "-NABIL"]) assert.equal(parseSymbol(bad), null, bad);
+  assert.equal(normalizeSymbol(7), null);
 });
