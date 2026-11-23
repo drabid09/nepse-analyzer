@@ -55,7 +55,19 @@ export type Floorsheet = {
 };
 export type Adjustment = { company_id: number; ex_date: string; factor: number; status: string; source: string; note: string | null };
 
+// How long a read may be reused before Supabase is asked again. Live prices change every
+// 5 minutes during trading; calls, ranges and the floorsheet change once a day, after the
+// close. Reusing reads keeps the database's monthly data transfer well inside the free plan
+// (see docs/phase5-quality.md).
+const LIVE = 60;
+const DAILY = 600;
+const HISTORY = 900;
 const HOUR = 3600;
+
+/** Columns the list pages need from a price row. */
+export type PriceLite = Pick<Price, "company_id" | "date" | "close" | "prev_close" | "is_final">;
+/** Columns the list pages need from a signal row. */
+export type SignalLite = Pick<Signal, "company_id" | "date" | "recommendation" | "score" | "confidence" | "trend_short" | "rsi_14" | "close" | "data_ok" | "data_note">;
 
 export async function companies() {
   const [list, sectors] = await Promise.all([
@@ -79,19 +91,24 @@ export async function health() {
 }
 
 export async function latestSignalDate(): Promise<string | null> {
-  const rows = await rest<{ date: string }>("signals", { select: "date", order: "date.desc", limit: 1 });
+  const rows = await rest<{ date: string }>("signals", { select: "date", order: "date.desc", limit: 1 }, { revalidate: LIVE });
   return rows[0]?.date ?? null;
 }
 
-export const signalsOn = (date: string) => rest<Signal>("signals", { select: "*", date: `eq.${date}` }, { all: true });
+export const signalsOn = (date: string) =>
+  rest<SignalLite>("signals", { select: "company_id,date,recommendation,score,confidence,trend_short,rsi_14,close,data_ok,data_note", date: `eq.${date}` }, { all: true, revalidate: DAILY });
 export const forecastsOn = (date: string, horizon = "1M") =>
-  rest<Forecast>("forecasts", { select: "company_id,horizon,low,mid,high,reliable,target_date,base_close", made_on: `eq.${date}`, horizon: `eq.${horizon}`, model: "eq.ensemble" }, { all: true });
+  rest<Forecast>("forecasts", { select: "company_id,horizon,low,mid,high,reliable,target_date,base_close", made_on: `eq.${date}`, horizon: `eq.${horizon}`, model: "eq.ensemble" }, { all: true, revalidate: DAILY });
+
+export async function latestPriceDate(): Promise<string | null> {
+  const last = await rest<{ date: string }>("daily_prices", { select: "date", order: "date.desc", limit: 1 }, { revalidate: LIVE });
+  return last[0]?.date ?? null;
+}
 
 export async function latestPrices() {
-  const last = await rest<{ date: string }>("daily_prices", { select: "date", order: "date.desc", limit: 1 });
-  const date = last[0]?.date;
-  if (!date) return { date: null as string | null, rows: [] as Price[] };
-  const rows = await rest<Price>("daily_prices", { select: "company_id,date,open,high,low,close,prev_close,volume,turnover,trades,is_final", date: `eq.${date}` }, { all: true });
+  const date = await latestPriceDate();
+  if (!date) return { date: null as string | null, rows: [] as PriceLite[] };
+  const rows = await rest<PriceLite>("daily_prices", { select: "company_id,date,close,prev_close,is_final", date: `eq.${date}` }, { all: true, revalidate: LIVE });
   return { date, rows };
 }
 
@@ -113,20 +130,34 @@ export async function companyBySymbol(symbol: string) {
   return rows[0] ?? null;
 }
 
-export const companyPrices = (companyId: number, since: string) =>
-  rest<Price>("daily_prices", { select: "date,open,high,low,close,prev_close,volume,turnover,trades,adj_factor,is_final", company_id: `eq.${companyId}`, date: `gte.${since}`, order: "date" }, { all: true });
+const PRICE_COLUMNS = "date,open,high,low,close,prev_close,volume,turnover,trades,adj_factor,is_final";
+
+/** Daily bars from `since`: the history before the latest day is reused for 15 minutes, the latest day for one minute. */
+export async function companyPrices(companyId: number, since: string) {
+  const latest = await latestPriceDate();
+  if (!latest) return [] as Price[];
+  const [history, today] = await Promise.all([
+    rest<Price>("daily_prices", { select: PRICE_COLUMNS, company_id: `eq.${companyId}`, and: `(date.gte.${since},date.lt.${latest})`, order: "date" }, { all: true, revalidate: HISTORY }),
+    rest<Price>("daily_prices", { select: PRICE_COLUMNS, company_id: `eq.${companyId}`, date: `eq.${latest}` }, { revalidate: LIVE }),
+  ]);
+  return [...history, ...today];
+}
 export const companyIntraday = (companyId: number, sinceIso: string) =>
   rest<{ ts: string; ltp: number; volume: number | null }>("intraday_snapshots", { select: "ts,ltp,volume", company_id: `eq.${companyId}`, ts: `gte.${sinceIso}`, order: "ts" }, { all: true });
-export const companySignals = (companyId: number, limit = 60) =>
-  rest<Signal>("signals", { select: "*", company_id: `eq.${companyId}`, order: "date.desc", limit });
+export async function companySignal(companyId: number) {
+  const rows = await rest<Signal>("signals", { select: "*", company_id: `eq.${companyId}`, order: "date.desc", limit: 1 }, { revalidate: DAILY });
+  return rows[0] ?? null;
+}
+export const companyCallHistory = (companyId: number, limit = 12) =>
+  rest<Pick<Signal, "date" | "recommendation" | "score" | "data_ok">>("signals", { select: "date,recommendation,score,data_ok", company_id: `eq.${companyId}`, order: "date.desc", limit }, { revalidate: DAILY });
 export const companyForecasts = (companyId: number, madeOn: string) =>
-  rest<Forecast>("forecasts", { select: "*", company_id: `eq.${companyId}`, made_on: `eq.${madeOn}`, model: "eq.ensemble" });
+  rest<Forecast>("forecasts", { select: "*", company_id: `eq.${companyId}`, made_on: `eq.${madeOn}`, model: "eq.ensemble" }, { revalidate: DAILY });
 export const companyBacktests = (companyId: number) =>
   rest<Backtest>("backtest_results", { select: "*", company_id: `eq.${companyId}` }, { revalidate: HOUR });
 export const marketBacktests = () =>
   rest<Backtest>("backtest_results", { select: "*", company_id: "is.null" }, { revalidate: HOUR });
 export const companyFloorsheet = (companyId: number) =>
-  rest<Floorsheet>("floorsheet_daily", { select: "*", company_id: `eq.${companyId}`, order: "date.desc", limit: 1 });
+  rest<Floorsheet>("floorsheet_daily", { select: "*", company_id: `eq.${companyId}`, order: "date.desc", limit: 1 }, { revalidate: DAILY });
 export const companyAdjustments = (companyId: number) =>
   rest<Adjustment>("price_adjustments", { select: "company_id,ex_date,factor,status,source,note", company_id: `eq.${companyId}`, order: "ex_date.desc", limit: 30 }, { revalidate: HOUR });
 export const issues = (filters: Record<string, string> = {}, limit = 50) =>
