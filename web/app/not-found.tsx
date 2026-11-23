@@ -4,8 +4,11 @@ import { Card, Title } from "@/components/ui";
 export default function NotFound() {
   return (
     <Card>
-      <Title>Not found</Title>
-      <p className="text-[15px] text-muted">No company with that symbol. <Link href="/signals" className="text-accent underline underline-offset-2">See all companies</Link>.</p>
+      <Title>Page not found</Title>
+      <p className="text-[15px] text-muted">
+        This page does not exist. Go to the <Link href="/" className="text-accent underline underline-offset-2">Market</Link> page,
+        or <Link href="/signals" className="text-accent underline underline-offset-2">see all companies</Link>.
+      </p>
     </Card>
   );
 }
