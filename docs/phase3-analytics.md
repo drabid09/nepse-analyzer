@@ -59,18 +59,18 @@ For 1 week, 1 month and 3 months ahead: an 80% range (1 in 5 outcomes should fal
 
 ## What the backtest found
 
-Run on 23 Nov 2026 over 30 Jul 2023 to 20 Nov 2026 (about 3 years), 281 tradable equities, prices adjusted for bonus and right shares, using only data available on each day. The rules were written before this test and not changed after it.
+Run on 23 Nov 2026 (re-run after the take-profit change) over 30 Jul 2023 to 20 Nov 2026 (about 3 years), 281 tradable equities, prices adjusted for bonus and right shares, using only data available on each day. The rules were written before this test and not changed after it.
 
 **What followed each kind of call (next 21 trading days, before costs):**
 
 | Call | Times it was given | Average change | Rose |
 |---|---|---|---|
-| Buy | 45,557 | **+1.94%** | 46% of the time |
-| Hold | 84,603 | +0.87% | 45% |
+| Buy | 45,558 | **+1.94%** | 46% of the time |
+| Hold | 84,602 | +0.87% | 45% |
 | Sell | 36,894 | +1.03% | 50% |
 | All calls | 167,054 | +1.20% | 47% |
 
-**Following the buy calls as a strategy** (sell at the stop loss, the first take-profit, a sell call or after 63 days; 0.75% costs per round trip and 5% tax on gains): 4,806 trades, 49% profitable, average gain 8.6%, average loss 8.3%. Roughly break-even after costs.
+**Following the buy calls as a strategy** (sell at the stop loss, the first take-profit, a sell call or after 63 days; 0.75% costs per round trip and 5% tax on gains): 4,863 trades, 50% profitable, average gain 8.5%, average loss 8.3%. Roughly break-even after costs.
 
 **Price ranges** (target: 80% of outcomes inside the range):
 
