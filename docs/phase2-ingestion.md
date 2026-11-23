@@ -74,7 +74,11 @@ First session, 23 Nov 2026. The run started at 09:48 and polled every 5 minutes.
 - **The newest trade in NEPSE's live list was 22 seconds older than our snapshot.** The list is close to real time during trading, which answers Phase 0's open question about freshness.
 - The run's `job_runs` row (status `running`) is updated at every snapshot, so the website can show "last updated" and spot a stalled job.
 
-The session's totals (snapshots, failures, lag range) and today's end-of-day run are added below once they are in.
+Whole session: the live run went from 09:50 to 15:05 Nepal time with **50 snapshots and no failures** (326 NEPSE requests, 26,114 rows written). The newest trade in NEPSE's list was a median of 79 seconds and at most 320 seconds older than our snapshot. Every security NEPSE listed was already in our companies table.
+
+End of day for 23 Nov: **360 traded securities finalised** from NEPSE's today's-price list (132 advancing, 211 declining, 17 unchanged); floorsheet of **42,854 trades in 86 pages, exactly NEPSE's count**, summarised for 360 companies; 17 indices final, with 8,213 intraday graph points; no bonus or right adjustments; database 130.1 MB; 113 NEPSE requests and 8,951 rows written. Daily analytics then started by itself: 269 signals and 780 price ranges, and all 280 closes compared with Sharesansar were identical. One data check fired: MCHL closed at 283.20, +10.6% on its previous close of 256.10, beyond NEPSE's 10% limit. Sharesansar showed the same figures, so the price is faithful to the source, but MCHL gets no call that day, as designed.
+
+The end-of-day run was started by hand at 15:31. GitHub had not yet started any scheduled workflow from `main` since they were merged at 12:10 (the watchdog was due at 13:05, 14:05 and 15:05, the end of day at 15:20), although runs triggered by pushes, by hand and by another workflow all worked.
 
 ## Data quality notes
 
