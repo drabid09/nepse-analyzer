@@ -151,8 +151,9 @@ export default function GuidePage() {
 
       <Section id="signals" n={3} title="Signals: every company in one list" sub="For finding companies worth a closer look.">
         <Steps>
-          <li><b className="text-ink">Filter by call.</b> Tap <L>Buy</L>, <L>Hold</L>, <L>Sell</L> or <L>No call</L>, or <L>Your stocks</L> for your
-            starred companies. The number on each button is how many companies it has.</li>
+          <li><b className="text-ink">Filter by call.</b> Tap <L>Buy</L>, <L>Hold</L>, <L>Sell</L> or <L>No call</L>; add <L>Only your stocks</L> to
+            narrow it to your starred companies. The number on each button is how many companies it would show with the other filters you chose.
+            Your filters stay in the page address, so Back, refresh or a shared link show the same list.</li>
           <li><b className="text-ink">Narrow it down.</b> Choose a sector, or type part of a name in <L>Filter</L>.</li>
           <li><b className="text-ink">Sort.</b> Tap a column heading (<L>Company</L>, <L>Price</L>, <L>Today</L>, <L>Score</L>) to sort by it; tap
             again to reverse.</li>
@@ -182,7 +183,8 @@ export default function GuidePage() {
             <LevelLadder />
           </li>
           <li><b className="text-ink">Call.</b> The big badge (<CallBadge call="buy" />, <CallBadge call="hold" />, <CallBadge call="sell" /> or{" "}
-            <CallBadge call="avoid" />), the date it was made from, the score and the confidence. Then the levels:
+            <CallBadge call="avoid" />), the date it was made from, the score and the confidence. Then the levels (the full plan
+            below is shown on buy calls only; a hold or sell call shows just the exit level, support and resistance, for when you already own it):
             <ul className="list-disc pl-5 mt-2 space-y-1">
               <li><L>Buy zone</L>: the price area the plan would buy in.</li>
               <li><L>Stop loss</L>: the exit if it goes wrong. The small number under it is how far below today&apos;s price it is.</li>

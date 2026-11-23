@@ -14,6 +14,7 @@ An interactive website for exploring the Nepal Stock Exchange. Educational analy
 | 5 | Quality and launch | Tests on every change, live-site monitor, weekly backup, free-plan budget, guide page. See [docs/phase5-quality.md](docs/phase5-quality.md) |
 | After launch | Personal edition | Made for Sanjeev: step-by-step guide, his watchlist ("Your stocks"), private feedback that notifies Drabid. See [docs/sanjeev-edition.md](docs/sanjeev-edition.md) |
 | After launch | Supabase timer | Supabase starts the GitHub jobs on time, because GitHub's own schedule proved unreliable. See [docs/timer.md](docs/timer.md) |
+| After launch | Audit and hardening | Navigation state, data accuracy (NEPSE change, ranges, track record), headers and abuse limits; click-through tests. See [docs/audit-2026-11-23.md](docs/audit-2026-11-23.md) |
 
 ## Tests
 

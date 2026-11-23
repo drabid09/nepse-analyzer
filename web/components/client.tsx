@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { ago } from "@/lib/format";
+import { companyHref } from "@/lib/symbol";
 
 /**
  * Keeps an open page current: re-reads it from the server every minute during trading hours and
@@ -76,41 +77,64 @@ export function Nav() {
 export function SearchBox({ companies }: { companies: { symbol: string; name: string }[] }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
   const router = useRouter();
   const box = useRef<HTMLDivElement>(null);
+  const term = useDeferredValue(q).trim().toLowerCase();
   const results = useMemo(() => {
-    const term = q.trim().toLowerCase();
     if (!term) return [];
-    const starts = companies.filter((c) => c.symbol.toLowerCase().startsWith(term));
+    const exact = companies.filter((c) => c.symbol.toLowerCase() === term);
+    const starts = companies.filter((c) => c.symbol.toLowerCase() !== term && c.symbol.toLowerCase().startsWith(term));
     const rest = companies.filter((c) => !c.symbol.toLowerCase().startsWith(term) && (c.symbol.toLowerCase().includes(term) || c.name.toLowerCase().includes(term)));
-    return [...starts, ...rest].slice(0, 8);
-  }, [q, companies]);
+    return [...exact, ...starts, ...rest].slice(0, 8);
+  }, [term, companies]);
+  const shown = open && results.length > 0;
 
   useEffect(() => {
-    const close = (e: MouseEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
+    const close = (e: PointerEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
   }, []);
+
+  const go = (symbol: string) => {
+    setQ("");
+    setOpen(false);
+    setActive(0);
+    router.push(companyHref(symbol));
+  };
 
   return (
     <div ref={box} className="relative w-full sm:w-64">
       <input
+        type="search"
+        role="combobox"
+        aria-expanded={shown}
+        aria-controls="company-search-results"
+        aria-autocomplete="list"
+        aria-activedescendant={shown ? `company-search-${active}` : undefined}
         value={q}
-        onChange={(e) => { setQ(e.target.value); setOpen(true); }}
+        maxLength={60}
+        autoComplete="off"
+        enterKeyHint="go"
+        onChange={(e) => { setQ(e.target.value); setOpen(true); setActive(0); }}
         onFocus={() => setOpen(true)}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && results[0]) { router.push(`/c/${results[0].symbol}`); setQ(""); setOpen(false); }
-          if (e.key === "Escape") setOpen(false);
+          if (e.key === "ArrowDown" && results.length) { e.preventDefault(); setOpen(true); setActive((i) => (i + 1) % results.length); }
+          else if (e.key === "ArrowUp" && results.length) { e.preventDefault(); setActive((i) => (i - 1 + results.length) % results.length); }
+          else if (e.key === "Enter") { e.preventDefault(); const pick = results[Math.min(active, results.length - 1)]; if (pick) go(pick.symbol); }
+          else if (e.key === "Escape") setOpen(false);
         }}
         placeholder="Search a company or symbol"
         aria-label="Search a company or symbol"
         className="w-full rounded-full bg-soft px-4 py-2 text-[14px] outline-none placeholder:text-faint focus:ring-2 focus:ring-accent/40"
       />
-      {open && results.length > 0 ? (
-        <ul className="absolute z-20 mt-2 w-full rounded-2xl border border-line bg-card shadow-lg overflow-hidden">
-          {results.map((c) => (
-            <li key={c.symbol}>
-              <Link href={`/c/${c.symbol}`} onClick={() => { setQ(""); setOpen(false); }} className="block px-4 py-2.5 hover:bg-soft">
+      {shown ? (
+        <ul id="company-search-results" role="listbox" className="absolute z-20 mt-2 w-full rounded-2xl border border-line bg-card shadow-lg overflow-hidden">
+          {results.map((c, i) => (
+            <li key={c.symbol} id={`company-search-${i}`} role="option" aria-selected={i === active}>
+              <Link href={companyHref(c.symbol)} prefetch={false} onClick={() => { setQ(""); setOpen(false); setActive(0); }}
+                onMouseEnter={() => setActive(i)}
+                className={`block px-4 py-2.5 ${i === active ? "bg-soft" : ""}`}>
                 <span className="font-semibold text-[14px]">{c.symbol}</span>
                 <span className="block text-[12px] text-muted truncate">{c.name}</span>
               </Link>

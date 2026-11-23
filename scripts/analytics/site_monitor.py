@@ -149,9 +149,9 @@ def expected(db: Supabase) -> dict:
     index = db.select("index_daily", select="date,close", index_id=f"eq.{NEPSE_INDEX_ID}", order="date.desc", limit=1)
     if not (final and sig_day and price_day and index):
         raise JobError("the database has no final day, signals, prices or NEPSE index yet")
-    signals = db.select_all("signals", select="company_id", date=f"eq.{sig_day[0]['date']}")
-    prices = db.select_all("daily_prices", select="company_id,close", date=f"eq.{price_day[0]['date']}")
-    symbols = {c["id"]: c["symbol"] for c in db.select_all("companies", select="id,symbol")}
+    signals = db.select_all("signals", select="company_id", date=f"eq.{sig_day[0]['date']}", order="company_id")
+    prices = db.select_all("daily_prices", select="company_id,close", date=f"eq.{price_day[0]['date']}", order="company_id")
+    symbols = {c["id"]: c["symbol"] for c in db.select_all("companies", select="id,symbol", order="id")}
     with_signal = {s["company_id"] for s in signals}
     priced = sorted((symbols[p["company_id"]], float(p["close"])) for p in prices
                     if p["company_id"] in with_signal and p["company_id"] in symbols)

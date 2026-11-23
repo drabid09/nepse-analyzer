@@ -29,7 +29,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import (  # noqa: E402
     NPT, JobError, JobRun, NepseSource, Supabase, company_maps, lookup_company,
-    now_npt, num, run, whole, write_summary,
+    now_npt, num, previous_index_closes, run, settle_index_prev_close, whole, write_summary,
 )
 
 INTERVAL = timedelta(minutes=5)
@@ -87,6 +87,7 @@ class Session:
         self.errors: list[str] = []
         self.unmapped: set[str] = set()
         self.seen_open = False
+        self.previous_index: dict[int, float] | None = None  # last final close per index, read once
 
     # ------------------------------------------------------------------ one snapshot
 
@@ -165,6 +166,10 @@ class Session:
                 "prev_close": round(value - change, 2) if change is not None else None, "is_final": False,
             })
             index_points.append({"index_id": index_id, "ts": ts, "value": value})
+
+        if self.previous_index is None:
+            self.previous_index = previous_index_closes(self.db, at.date())
+        settle_index_prev_close(index_days, self.previous_index)
 
         market = {"date": today, "advancers": advancers, "decliners": decliners, "unchanged": unchanged,
                   "is_final": False, **summary_fields(summary)}

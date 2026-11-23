@@ -5,7 +5,10 @@
 // browser because every query runs on the server. Set SUPABASE_URL and
 // SUPABASE_ANON_KEY in the Vercel project's environment variables.
 
+/** An error whose message is safe to show visitors. Details stay in the server log. */
 export class DataError extends Error {}
+
+if (typeof window !== "undefined") throw new Error("lib/db.ts runs on the server only: it holds the database key.");
 
 export function configured(): boolean {
   return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY);
@@ -63,6 +66,7 @@ export async function insert(table: string, row: Record<string, unknown>): Promi
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     if (text.includes("Too many messages")) throw new DataError("Too many messages right now. Please try again later.");
+    console.error(`insert ${table} failed: HTTP ${response.status} ${text.slice(0, 300)}`);
     throw new DataError(`The database refused the message (HTTP ${response.status}).`);
   }
 }
@@ -88,9 +92,17 @@ export async function rest<T>(table: string, params: Params = {}, options: { rev
     }
     if (!response.ok) {
       const text = await response.text().catch(() => "");
-      throw new DataError(`Database refused a read of ${table}: HTTP ${response.status} ${text.slice(0, 200)}`);
+      // The database's own message can name columns and settings: log it, show only the status.
+      console.error(`read ${table} failed: HTTP ${response.status} ${text.slice(0, 300)}`);
+      throw new DataError(`The database refused a read of ${table} (HTTP ${response.status}).`);
     }
-    const chunk = (await response.json()) as T[];
+    let chunk: T[];
+    try {
+      chunk = (await response.json()) as T[];
+    } catch {
+      throw new DataError(`The database sent an unreadable answer for ${table}.`);
+    }
+    if (!Array.isArray(chunk)) throw new DataError(`The database sent an unexpected answer for ${table}.`);
     rows.push(...chunk);
     if (!options.all || chunk.length < page) return rows;
   }

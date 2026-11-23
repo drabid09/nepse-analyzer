@@ -30,8 +30,10 @@ async function chrome() {
   try {
     const [c, h] = await Promise.all([companies(), health()]);
     const list = c.list.filter((x) => x.instrument_type === "Equity" || x.is_tradable).map((x) => ({ symbol: x.symbol, name: x.name }));
-    return { list, f: freshness(h.runs, h.latestFinal, h.marketErrors), renderedAt: new Date().toISOString() };
-  } catch {
+    return { list, f: freshness(h.runs, h.latestFinal, h.marketErrors, new Date(), h.signalDate), renderedAt: new Date().toISOString() };
+  } catch (error) {
+    // The header is optional: without it each page still shows its own data or its own error.
+    console.error("header data unavailable:", error instanceof Error ? error.message : error);
     return null;
   }
 }

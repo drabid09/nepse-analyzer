@@ -5,7 +5,7 @@ import { Card, Empty, Pill, Title } from "@/components/ui";
 import * as data from "@/lib/data";
 import { configured } from "@/lib/db";
 import { ago, dateTime, day } from "@/lib/format";
-import { freshness } from "@/lib/market";
+import { freshness, jobLate } from "@/lib/market";
 
 export const revalidate = 60;
 export const metadata: Metadata = { title: "Data health" };
@@ -30,7 +30,8 @@ export default async function HealthPage() {
   if (!configured()) return <Setup />;
   try {
     const [h, runs, issueRows] = await Promise.all([data.health(), data.recentRuns(30), data.issues({}, 30)]);
-    const f = freshness(h.runs, h.latestFinal, h.marketErrors);
+    const now = new Date();
+    const f = freshness(h.runs, h.latestFinal, h.marketErrors, now, h.signalDate);
     const latest = Object.fromEntries(h.runs.map((r) => [r.job, r]));
     return (
       <div className="space-y-6">
@@ -54,15 +55,17 @@ export default async function HealthPage() {
           <ul className="divide-y divide-line">
             {Object.entries(JOBS).map(([job, [label, when]]) => {
               const r = latest[job];
+              const late = r ? jobLate(job, r.heartbeat_at, now) : null;
               return (
                 <li key={job} className="py-3 flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="text-[15px] font-medium">{label}</div>
                     <div className="text-[12px] text-faint">{when}</div>
                     {r?.message ? <div className="text-[13px] text-muted mt-1 max-w-[640px]">{r.message}</div> : null}
+                    {late ? <div className="text-[13px] text-warn mt-1">{late}</div> : null}
                   </div>
                   <div className="text-right">
-                    {r ? <Pill tone={tone(r.status) as never}>{r.status}</Pill> : <Pill>not run yet</Pill>}
+                    {r ? <Pill tone={late ? "warn" : tone(r.status) as never}>{late ? "late" : r.status}</Pill> : <Pill>not run yet</Pill>}
                     {r ? <div className="text-[12px] text-faint mt-1">{dateTime(r.heartbeat_at)} · <Ago ts={r.heartbeat_at} initial={ago(r.heartbeat_at)} /></div> : null}
                   </div>
                 </li>

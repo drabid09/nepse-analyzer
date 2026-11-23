@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { PriceChart, type Bar } from "@/components/charts";
 import { Setup, Unavailable } from "@/components/states";
 import { StarButton } from "@/components/watchlist";
@@ -9,6 +9,7 @@ import { CallBadge, Card, Change, Empty, Pill, ScoreBar, Stat, Title, Trend } fr
 import * as data from "@/lib/data";
 import { configured } from "@/lib/db";
 import { change, day, num, pct, price, rupees, whole } from "@/lib/format";
+import { companyHref, parseSymbol } from "@/lib/symbol";
 
 export const revalidate = 60;
 // Company pages are rendered on first visit and then served from Vercel's cache like the
@@ -22,16 +23,21 @@ export function generateStaticParams() {
 type Props = { params: Promise<{ symbol: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { symbol } = await params;
-  return { title: symbol.toUpperCase() };
+  const symbol = parseSymbol((await params).symbol);
+  return { title: symbol ?? "Not found" };
 }
 
 export default async function CompanyPage({ params }: Props) {
   if (!configured()) return <Setup />;
-  const { symbol } = await params;
+  const segment = (await params).symbol;
+  // Checked before any database read: a made-up address costs no query and no cached page.
+  const symbol = parseSymbol(segment);
+  if (!symbol) notFound();
+  // One address per company: /c/nabil becomes /c/NABIL instead of a second cached copy.
+  if (segment !== symbol) redirect(companyHref(symbol));
   let company: data.Company | null;
   try {
-    company = await data.companyBySymbol(decodeURIComponent(symbol));
+    company = await data.companyBySymbol(symbol);
   } catch (e) {
     return <Unavailable error={e} />;
   }
@@ -64,8 +70,14 @@ async function Company({ company }: { company: data.Company }) {
   const strategy = backtests.find((b) => b.kind === "strategy" && b.name === "signal");
   const rangeTests = backtests.filter((b) => b.kind === "forecast");
   const order = { "1W": 0, "1M": 1, "3M": 2 } as Record<string, number>;
-  const sortedForecasts = [...forecasts].sort((a, b) => order[a.horizon] - order[b.horizon]);
-  const showLevels = signal && signal.data_ok && signal.recommendation !== "avoid";
+  const sortedForecasts = forecasts
+    .filter((f) => num(f.low) !== null && num(f.high) !== null && num(f.mid) !== null && num(f.base_close))
+    .sort((a, b) => order[a.horizon] - order[b.horizon]);
+  const usable = Boolean(signal && signal.data_ok && signal.recommendation !== "avoid");
+  // The trade plan (buy zone, targets) belongs to a buy call only. On a hold or sell call it
+  // would contradict the call, so those show the levels a holder needs and nothing to buy.
+  const buyPlan = usable && signal!.recommendation === "buy";
+  const chartLevels = !usable || !signal ? undefined : buyPlan ? signal : { stop_loss: signal.stop_loss };
   const fromClose = (v: number | null | undefined) => (close && v ? pct((Number(v) / close - 1) * 100, 1) : "");
 
   return (
@@ -85,7 +97,7 @@ async function Company({ company }: { company: data.Company }) {
       </div>
 
       <Card>
-        {bars.length ? <PriceChart bars={bars} intraday={intraday} levels={showLevels && signal ? signal : undefined} /> : <Empty>No price history.</Empty>}
+        {bars.length ? <PriceChart bars={bars} intraday={intraday} levels={chartLevels} /> : <Empty>No price history.</Empty>}
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
@@ -106,7 +118,7 @@ async function Company({ company }: { company: data.Company }) {
                 <div className="flex items-center gap-2 text-[13px] text-muted">Score <ScoreBar score={signal.score} /></div>
                 <div className="text-[13px] text-muted">Confidence <span className="text-ink capitalize">{signal.confidence}</span></div>
               </div>
-              {showLevels ? (
+              {buyPlan ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-4 mb-5">
                   <Stat label="Buy zone" value={<span className="text-[17px]">{price(signal.buy_low)} – {price(signal.buy_high)}</span>} />
                   <Stat label="Stop loss" value={<span className="text-[17px]">{price(signal.stop_loss)}</span>} note={fromClose(signal.stop_loss)} tone="down" />
@@ -115,15 +127,28 @@ async function Company({ company }: { company: data.Company }) {
                   <Stat label="Support (20-day low)" value={<span className="text-[17px]">{price(signal.support)}</span>} />
                   <Stat label="Resistance (60-day high)" value={<span className="text-[17px]">{price(signal.resistance)}</span>} />
                 </div>
+              ) : usable ? (
+                <>
+                  <p className="text-[13px] text-muted rounded-2xl bg-soft px-4 py-3 mb-4 leading-relaxed">
+                    {signal.recommendation === "sell"
+                      ? "A sell call: weaker than most companies right now. There is no buy plan. If you hold it, the levels below show where it has support and where to exit."
+                      : "A hold call: no new buy plan. If you hold it, the levels below show where it has support and where to exit."}
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-4 mb-5">
+                    <Stat label="Exit if it falls below" value={<span className="text-[17px]">{price(signal.stop_loss)}</span>} note={fromClose(signal.stop_loss)} tone="down" />
+                    <Stat label="Support (20-day low)" value={<span className="text-[17px]">{price(signal.support)}</span>} />
+                    <Stat label="Resistance (60-day high)" value={<span className="text-[17px]">{price(signal.resistance)}</span>} />
+                  </div>
+                </>
               ) : null}
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
                   <div className="text-[12px] text-muted uppercase tracking-wide mb-2">For</div>
-                  {signal.reasons_for.length ? <ul className="space-y-1.5 text-[14px]">{signal.reasons_for.map((r) => <li key={r} className="flex gap-2"><span className="text-up">+</span>{r}</li>)}</ul> : <p className="text-[14px] text-faint">Nothing notable.</p>}
+                  {signal.reasons_for.length ? <ul className="space-y-1.5 text-[14px]">{signal.reasons_for.map((r, i) => <li key={`${i}-${r}`} className="flex gap-2"><span className="text-up">+</span>{r}</li>)}</ul> : <p className="text-[14px] text-faint">Nothing notable.</p>}
                 </div>
                 <div>
                   <div className="text-[12px] text-muted uppercase tracking-wide mb-2">Against</div>
-                  {signal.reasons_against.length ? <ul className="space-y-1.5 text-[14px]">{signal.reasons_against.map((r) => <li key={r} className="flex gap-2"><span className="text-down">−</span>{r}</li>)}</ul> : <p className="text-[14px] text-faint">Nothing notable.</p>}
+                  {signal.reasons_against.length ? <ul className="space-y-1.5 text-[14px]">{signal.reasons_against.map((r, i) => <li key={`${i}-${r}`} className="flex gap-2"><span className="text-down">−</span>{r}</li>)}</ul> : <p className="text-[14px] text-faint">Nothing notable.</p>}
                 </div>
               </div>
             </>
@@ -157,7 +182,8 @@ async function Company({ company }: { company: data.Company }) {
                 );
               })}
             </div>
-          ) : <Empty>No ranges: the company is too illiquid, too new, or a data check failed.</Empty>}
+          ) : usable ? <Empty>The ranges for {signal ? day(signal.date) : "this day"} are not available yet. Try again in a few minutes.</Empty>
+            : <Empty>No ranges: the company is too illiquid, too new, or a data check failed.</Empty>}
         </Card>
       </div>
 
@@ -278,7 +304,7 @@ async function Company({ company }: { company: data.Company }) {
 
       <div className="flex flex-wrap justify-between gap-3 text-[14px]">
         <Link href="/signals" className="text-accent">← All signals</Link>
-        <Link href={`/feedback?about=${encodeURIComponent(company.symbol)}`} className="text-accent">Want to see more about {company.symbol}? Tell {BUILDER} →</Link>
+        <Link href={`/feedback?about=${encodeURIComponent(company.symbol)}`} prefetch={false} className="text-accent">Want to see more about {company.symbol}? Tell {BUILDER} →</Link>
       </div>
     </div>
   );

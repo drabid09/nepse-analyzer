@@ -27,3 +27,19 @@ export function checkFeedback(input: { kind: unknown; message: unknown; about?: 
   const about = typeof input.about === "string" ? input.about.trim().slice(0, ABOUT_MAX) : "";
   return { ok: true, spam: false, row: { kind, message, page: about || null, name } };
 }
+
+export const SEND_LIMIT = 5;
+export const SEND_WINDOW_MS = 10 * 60 * 1000;
+
+/** Sliding window: true (and the send is counted) if this visitor sent fewer than 5 in 10 minutes. */
+export function allowSend(log: Map<string, number[]>, visitor: string, now: number): boolean {
+  const kept = (log.get(visitor) ?? []).filter((t) => now - t < SEND_WINDOW_MS);
+  if (kept.length >= SEND_LIMIT) {
+    log.set(visitor, kept);
+    return false;
+  }
+  kept.push(now);
+  log.set(visitor, kept);
+  if (log.size > 5000) for (const key of log.keys()) { log.delete(key); if (log.size <= 4000) break; }
+  return true;
+}

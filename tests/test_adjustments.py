@@ -82,3 +82,33 @@ def test_many_companies_on_one_day_near_one_is_a_source_artefact():
     events.append({"ex_date": "2026-01-05", "factor": 0.8, "status": "confirmed", "note": None})
     assert bf.demote_mass_days(events) == 7
     assert events[-1]["status"] == "confirmed"  # a lone real bonus on another day is untouched
+
+
+# ---------------------------------------------------------------- index previous close
+
+from common import settle_index_prev_close  # noqa: E402
+
+
+def test_rolled_over_previous_close_is_replaced_by_the_stored_close():
+    # 23 Nov 2026: NEPSE reported previousClose == close after the close (0.00%).
+    rows = [{"index_id": 58, "close": 2623.56, "prev_close": 2623.56}]
+    settle_index_prev_close(rows, {58: 2621.29})
+    assert rows[0]["prev_close"] == 2621.29
+
+
+def test_missing_previous_close_is_filled_from_the_stored_close():
+    rows = [{"index_id": 51, "close": 1596.27, "prev_close": None}]
+    settle_index_prev_close(rows, {51: 1586.0})
+    assert rows[0]["prev_close"] == 1586.0
+
+
+def test_a_reported_previous_close_that_differs_is_trusted():
+    rows = [{"index_id": 51, "close": 1596.27, "prev_close": 1586.00}]
+    settle_index_prev_close(rows, {51: 1500.0})
+    assert rows[0]["prev_close"] == 1586.00
+
+
+def test_without_a_stored_close_nothing_changes():
+    rows = [{"index_id": 58, "close": 2623.56, "prev_close": 2623.56}]
+    settle_index_prev_close(rows, {})
+    assert rows[0]["prev_close"] == 2623.56
