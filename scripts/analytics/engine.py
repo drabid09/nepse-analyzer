@@ -176,8 +176,11 @@ def levels(ind: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         "buy_low": np.maximum(support, c - atr),
         "buy_high": c,
         "stop_loss": np.maximum(support - 0.5 * atr, c - 3 * atr).clip(lower=0.01),
-        "take_profit_low": np.maximum(resistance, c + 1.5 * atr),
-        "take_profit_high": np.maximum(resistance, c + 1.5 * atr) + atr,
+        # First target: the 60-day high, but no closer than 1.5 ATR and no
+        # further than 4 ATR, so a stock far below an old high gets a target it
+        # can plausibly reach within weeks.
+        "take_profit_low": np.minimum(np.maximum(resistance, c + 1.5 * atr), c + 4 * atr),
+        "take_profit_high": np.minimum(np.maximum(resistance, c + 1.5 * atr), c + 4 * atr) + atr,
     }
 
 
