@@ -17,12 +17,20 @@ declare
     'update public.sectors set name = name',
     'delete from public.indices',
     'truncate public.signals',
-    'insert into public.daily_prices (company_id, date, close, source) select id, current_date, 1, ''test'' from public.companies limit 1'
+    'insert into public.daily_prices (company_id, date, close, source) select id, current_date, 1, ''test'' from public.companies limit 1',
+    'insert into public.job_runs (job, status, runner) values (''live'', ''ok'', ''security-test'')',
+    'delete from public.price_adjustments',
+    -- Phase 2 helper functions are for the fetch jobs only.
+    'select public.apply_price_adjustments(1)',
+    'select * from public.storage_report()',
+    'select * from public.latest_closes_before(current_date, current_date - 30)',
+    'select * from public.trading_days(current_date - 30)'
   ];
 begin
-  -- 1. Structure: 15 tables, each with row level security on and one read policy.
+  -- 1. Structure: 17 tables (15 from Phase 1, job_runs and price_adjustments
+  --    from Phase 2), each with row level security on and one read policy.
   select count(*) into n from pg_tables where schemaname = 'public';
-  insert into check_results values ('15 tables exist', n = 15, n || ' found');
+  insert into check_results values ('17 tables exist', n = 17, n || ' found');
   select count(*) into n from pg_tables where schemaname = 'public' and not rowsecurity;
   insert into check_results values ('row level security is on everywhere', n = 0, n || ' tables without it');
   select count(*) into n from pg_policies where schemaname = 'public' and cmd <> 'SELECT';
@@ -33,8 +41,12 @@ begin
   select count(*) into n from public.sectors;
   reset role;
   insert into check_results values ('public can read sectors', n = 13, n || ' sectors visible');
+  set local role anon;
+  select count(*) into n from public.job_runs;
+  reset role;
+  insert into check_results values ('public can read job_runs', true, n || ' job runs visible');
 
-  -- 3. The public role cannot write. Each attempt must be refused. If one is
+  -- 3. The public role cannot write, or call the jobs' helper functions. Each attempt must be refused. If one is
   --    ever allowed, the deliberate error right after it rolls the write back,
   --    so this script can never change or delete real data.
   foreach attempt in array attempts loop
