@@ -1,3 +1,4 @@
 run_at_utc,run_at_npt,trigger,runner_country,nepse_tls_verified,nepse_homepage_status,nepse_calls_ok,nepse_calls_total,sharesansar_status,dataset_last_date
 2026-11-21 06:16:30,2026-11-21 12:01 NPT (Saturday),push,US,True,200,15,15,200,2026-11-20
 2026-11-21 06:27:08,2026-11-21 12:12 NPT (Saturday),push,US,True,200,15,15,200,2026-11-20
+2026-11-23 16:24:39,2026-11-23 22:09 NPT (Monday),schedule,US,True,200,15,15,200,2026-11-20
