@@ -11,4 +11,14 @@ An interactive website for exploring the Nepal Stock Exchange. Educational analy
 | 2 | Ingestion | Jobs built and run against the live database; running on schedule from `main`. See [docs/phase2-ingestion.md](docs/phase2-ingestion.md) |
 | 3 | Analytics and estimation engine | Data checks, signals, price ranges, backtest and watchdog built and running on schedule from `main`. See [docs/phase3-analytics.md](docs/phase3-analytics.md) |
 | 4 | Interactive website | Dashboard live at https://nepse-analyzer-peach.vercel.app. See [docs/phase4-dashboard.md](docs/phase4-dashboard.md) and [web/README.md](web/README.md) |
-| 5 | Quality and launch | Not started |
+| 5 | Quality and launch | Tests on every change, live-site monitor, weekly backup, free-plan budget, guide page. See [docs/phase5-quality.md](docs/phase5-quality.md) |
+
+## Tests
+
+```
+pip install -r scripts/analytics/requirements.txt -r tests/requirements.txt
+pytest tests                     # PG_ADMIN_DSN=<disposable Postgres> also runs the database tests
+cd web && npm ci && npm test && npm run typecheck && npm run build
+```
+
+The same steps run on GitHub for every pull request and every change to `main` (`.github/workflows/ci.yml`).

@@ -1,3 +1,4 @@
+import { Ago } from "@/components/client";
 import type { Metadata } from "next";
 import { Setup, Unavailable } from "@/components/states";
 import { Card, Empty, Pill, Title } from "@/components/ui";
@@ -61,7 +62,7 @@ export default async function HealthPage() {
                   </div>
                   <div className="text-right">
                     {r ? <Pill tone={tone(r.status) as never}>{r.status}</Pill> : <Pill>not run yet</Pill>}
-                    {r ? <div className="text-[12px] text-faint mt-1">{dateTime(r.heartbeat_at)} · {ago(r.heartbeat_at)}</div> : null}
+                    {r ? <div className="text-[12px] text-faint mt-1">{dateTime(r.heartbeat_at)} · <Ago ts={r.heartbeat_at} initial={ago(r.heartbeat_at)} /></div> : null}
                   </div>
                 </li>
               );

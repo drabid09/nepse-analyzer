@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Ago } from "@/components/client";
 import { ago, dateTime } from "@/lib/format";
 import type { Freshness } from "@/lib/market";
 
@@ -9,7 +10,7 @@ export function SessionPill({ f }: { f: Freshness }) {
     <Link href="/health" className="inline-flex items-center gap-2 text-[13px] text-muted hover:text-ink" title={f.lastUpdate ? `Last update ${dateTime(f.lastUpdate)}` : undefined}>
       <span className={`inline-block h-2 w-2 rounded-full ${dot} ${f.session === "open" && !f.problems.length ? "animate-pulse" : ""}`} />
       <span className="whitespace-nowrap">{label}</span>
-      <span className="text-faint whitespace-nowrap">· {ago(f.lastUpdate)}</span>
+      <span className="text-faint whitespace-nowrap">· <Ago ts={f.lastUpdate} initial={ago(f.lastUpdate)} /></span>
     </Link>
   );
 }
