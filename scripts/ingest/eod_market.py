@@ -35,7 +35,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import (  # noqa: E402
     NPT, JobError, JobRun, NepseSource, Supabase, company_maps, lookup_company,
-    now_npt, num, run, started_by_hand, whole, write_summary,
+    now_npt, num, previous_index_closes, run, settle_index_prev_close, started_by_hand, whole, write_summary,
 )
 from live_market import parse_npt, summary_fields  # noqa: E402
 import sharesansar  # noqa: E402
@@ -264,7 +264,7 @@ def detect_adjustments(db: Supabase, prices: list[dict], trade_date: date) -> li
         return []
     known_days = {r["date"] for r in db.rpc("trading_days", {"p_since": since.isoformat()})}
     holidays = {r["trade_date"] for r in db.select_all(
-        "job_runs", select="trade_date", status="eq.holiday", trade_date=f"gte.{since.isoformat()}")}
+        "job_runs", select="trade_date", status="eq.holiday", trade_date=f"gte.{since.isoformat()}", order="id")}
 
     events = []
     for row in prices:
@@ -513,6 +513,7 @@ def finalise(db: Supabase, nepse: NepseSource, run_log: JobRun, trade_date: date
     # 4. Indices
     known = {r["id"] for r in db.select("indices", select="id")}
     index_days, index_points, index_problems = index_rows(nepse, known, trade_date)
+    settle_index_prev_close(index_days, previous_index_closes(db, trade_date))
     problems += index_problems
     if index_days:
         written += db.upsert("index_daily", index_days, on_conflict="index_id,date")

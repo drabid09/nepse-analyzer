@@ -301,6 +301,35 @@ def lookup_company(row: dict, by_security: dict[str, int], by_symbol: dict[str, 
     return by_symbol.get(symbol)
 
 
+def previous_index_closes(db: "Supabase", trade_date: date) -> dict[int, float]:
+    """Each index's last final close before trade_date, from our own index_daily table."""
+    last = db.select("index_daily", select="date", is_final="eq.true", date=f"lt.{trade_date.isoformat()}",
+                     order="date.desc", limit=1)
+    if not last:
+        return {}
+    rows = db.select("index_daily", select="index_id,close", is_final="eq.true", date=f"eq.{last[0]['date']}")
+    return {int(r["index_id"]): float(r["close"]) for r in rows if r.get("close") is not None}
+
+
+def settle_index_prev_close(rows: list[dict], previous: dict[int, float]) -> list[dict]:
+    """Repairs a previous close that NEPSE has already rolled over.
+
+    Once the market has shut, getNepseIndex reports previousClose equal to the
+    close for the main indices, so the NEPSE Index showed 0.00% on 23 Nov 2026
+    (the real change was +2.27 points from 2,621.29). Where the reported previous
+    close is missing or identical to the close, the last final close we stored is
+    used instead. A previous close that differs from the close is left alone.
+    """
+    for row in rows:
+        stored = previous.get(row.get("index_id"))
+        close, prev = row.get("close"), row.get("prev_close")
+        if stored is None or close is None:
+            continue
+        if prev is None or abs(float(prev) - float(close)) < 0.005:
+            row["prev_close"] = round(stored, 2)
+    return rows
+
+
 def run(main) -> None:
     """Run a job; turn explainable failures into one clear line and exit code 1."""
     try:
