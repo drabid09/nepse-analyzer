@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "node --test lib/*.test.ts"
+    "test": "node --test lib/*.test.ts app/**/*.test.ts"
   },
   "dependencies": {
     "lightweight-charts": "5.2.1",
