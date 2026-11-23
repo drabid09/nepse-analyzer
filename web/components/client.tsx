@@ -3,35 +3,69 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ago } from "@/lib/format";
 
-/** Re-reads the page from the server every minute during trading hours, every 10 minutes otherwise. */
-export function AutoRefresh({ open }: { open: boolean }) {
+/**
+ * Keeps an open page current: re-reads it from the server every minute during trading hours and
+ * every 10 minutes otherwise, and straight away when the copy on screen is older than 90 seconds.
+ * That happens on the first visit after a quiet spell (pages are served from a cache while a fresh
+ * copy is made), when coming back to a tab or phone after a while, and after moving between pages.
+ */
+export function AutoRefresh({ open, renderedAt }: { open: boolean; renderedAt: string }) {
   const router = useRouter();
+  const path = usePathname();
+  const lastRefresh = useRef(0);
+
   useEffect(() => {
-    const id = setInterval(() => {
-      if (document.visibilityState === "visible") router.refresh();
-    }, open ? 60_000 : 600_000);
-    return () => clearInterval(id);
-  }, [open, router]);
+    const refreshIfOld = (limit: number) => {
+      const shown = Math.max(Date.parse(renderedAt) || 0, lastRefresh.current);
+      if (document.visibilityState === "visible" && Date.now() - shown > limit) {
+        lastRefresh.current = Date.now();
+        router.refresh();
+      }
+    };
+    refreshIfOld(90_000);
+    const id = setInterval(() => refreshIfOld(open ? 55_000 : 590_000), 15_000);
+    const onVisible = () => refreshIfOld(60_000);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [open, renderedAt, path, router]);
   return null;
+}
+
+/** "5 min ago" from the visitor's own clock, so a cached page never claims to be newer than it is. */
+export function Ago({ ts, initial }: { ts: string | null; initial: string }) {
+  const [text, setText] = useState(initial);
+  useEffect(() => {
+    const update = () => setText(ago(ts));
+    update();
+    const id = setInterval(update, 30_000);
+    return () => clearInterval(id);
+  }, [ts]);
+  return <>{text}</>;
 }
 
 export function Nav() {
   const path = usePathname();
+  // Short labels on phones so all five fit on one line.
   const items = [
-    ["/", "Market"],
-    ["/signals", "Signals"],
-    ["/track-record", "Track record"],
-    ["/health", "Data health"],
+    ["/", "Market", "Market"],
+    ["/signals", "Signals", "Signals"],
+    ["/track-record", "Track record", "Record"],
+    ["/health", "Data health", "Health"],
+    ["/guide", "Guide", "Guide"],
   ];
   return (
-    <nav className="flex gap-1 overflow-x-auto -mx-1 px-1">
-      {items.map(([href, label]) => {
+    <nav className="flex gap-0.5 sm:gap-1 overflow-x-auto -mx-1 px-1">
+      {items.map(([href, label, short]) => {
         const active = href === "/" ? path === "/" : path.startsWith(href);
         return (
-          <Link key={href} href={href}
-            className={`whitespace-nowrap rounded-full px-3 py-1.5 text-[14px] ${active ? "bg-ink text-bg font-medium" : "text-muted hover:text-ink"}`}>
-            {label}
+          <Link key={href} href={href} aria-current={active ? "page" : undefined}
+            className={`whitespace-nowrap rounded-full px-2 sm:px-3 py-1.5 text-[13.5px] sm:text-[14px] ${active ? "bg-ink text-bg font-medium" : "text-muted hover:text-ink"}`}>
+            <span className="sm:hidden">{short}</span><span className="hidden sm:inline">{label}</span>
           </Link>
         );
       })}

@@ -19,7 +19,7 @@ export function Unavailable({ error }: { error: unknown }) {
   return (
     <Card>
       <Title>Data temporarily unavailable</Title>
-      <p className="text-[15px] text-muted leading-relaxed">Nothing is shown rather than something possibly wrong. Try again in a minute. If it persists, the <Link href="/health" className="text-accent">data health</Link> page may say why.</p>
+      <p className="text-[15px] text-muted leading-relaxed">Nothing is shown rather than something possibly wrong. Try again in a minute. If it persists, the <Link href="/health" className="text-accent underline underline-offset-2">data health</Link> page may say why.</p>
       <p className="text-[12px] text-faint mt-3">{message}</p>
     </Card>
   );
