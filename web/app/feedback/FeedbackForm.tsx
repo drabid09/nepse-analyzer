@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useRef, useState, useTransition, type FormEvent } from "react";
 import { ABOUT_MAX, KINDS, MESSAGE_MAX } from "@/lib/feedback";
 import { BUILDER, VIEWER } from "@/lib/viewer";
 import { sendFeedback, type FeedbackState } from "./actions";
@@ -14,9 +14,31 @@ export function FeedbackForm({ about }: { about: string }) {
 }
 
 function OneMessage({ about, onAnother }: { about: string; onAnother: () => void }) {
-  const [state, action, pending] = useActionState(sendFeedback, START);
+  const [state, setState] = useState<FeedbackState>(START);
+  const [pending, startTransition] = useTransition();
+  const sending = useRef(false);
   const [kind, setKind] = useState<string>(KINDS[0].id);
   const [message, setMessage] = useState("");
+  const [topic, setTopic] = useState(about);
+
+  // Sent by hand rather than through <form action>: React clears a form after an action,
+  // which would wipe a long message when sending fails. A lost connection becomes a
+  // message on the form instead of the error page, and a double tap sends once.
+  const submit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (sending.current) return;
+    sending.current = true;
+    const form = new FormData(e.currentTarget);
+    startTransition(async () => {
+      try {
+        setState(await sendFeedback(state, form));
+      } catch {
+        setState({ status: "error", error: "No connection just now. Your message is still here: please try again." });
+      } finally {
+        sending.current = false;
+      }
+    });
+  };
 
   if (state.status === "sent") {
     return (
@@ -31,7 +53,7 @@ function OneMessage({ about, onAnother }: { about: string; onAnother: () => void
   }
 
   return (
-    <form action={action} className="space-y-5">
+    <form onSubmit={submit} className="space-y-5">
       <fieldset>
         <legend className="text-[14px] font-medium mb-2">What is it?</legend>
         <div className="grid gap-2 sm:grid-cols-2">
@@ -58,7 +80,7 @@ function OneMessage({ about, onAnother }: { about: string; onAnother: () => void
 
       <div>
         <label htmlFor="about" className="text-[14px] font-medium">About a company or page <span className="text-muted font-normal">(optional)</span></label>
-        <input id="about" name="about" defaultValue={about} maxLength={ABOUT_MAX} placeholder="e.g. NABIL, or the Signals page"
+        <input id="about" name="about" value={topic} onChange={(e) => setTopic(e.target.value)} maxLength={ABOUT_MAX} placeholder="e.g. NABIL, or the Signals page"
           className="mt-2 w-full rounded-full border border-line bg-bg px-4 py-2.5 text-[15px] outline-none focus:border-accent placeholder:text-faint" />
       </div>
 
