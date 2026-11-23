@@ -5,7 +5,7 @@ export default function NotFound() {
   return (
     <Card>
       <Title>Not found</Title>
-      <p className="text-[15px] text-muted">No company with that symbol. <Link href="/signals" className="text-accent">See all companies</Link>.</p>
+      <p className="text-[15px] text-muted">No company with that symbol. <Link href="/signals" className="text-accent underline underline-offset-2">See all companies</Link>.</p>
     </Card>
   );
 }

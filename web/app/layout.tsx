@@ -27,7 +27,7 @@ async function chrome() {
   try {
     const [c, h] = await Promise.all([companies(), health()]);
     const list = c.list.filter((x) => x.instrument_type === "Equity" || x.is_tradable).map((x) => ({ symbol: x.symbol, name: x.name }));
-    return { list, f: freshness(h.runs, h.latestFinal, h.marketErrors) };
+    return { list, f: freshness(h.runs, h.latestFinal, h.marketErrors), renderedAt: new Date().toISOString() };
   } catch {
     return null;
   }
@@ -65,7 +65,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             Sharesansar. Times are Nepal time.
           </p>
         </footer>
-        {data ? <AutoRefresh open={data.f.session === "open"} /> : null}
+        {data ? <AutoRefresh open={data.f.session === "open"} renderedAt={data.renderedAt} /> : null}
       </body>
     </html>
   );

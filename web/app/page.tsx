@@ -104,7 +104,7 @@ async function Market() {
           <p className="text-[13px] text-muted rounded-2xl bg-accent-soft px-4 py-3 mb-4 leading-relaxed">
             How much to trust a buy call: over the last three years, stocks rose <b className="text-ink">{nextMonth.buy.avg_gain_pct?.toFixed(2)}%</b> on average in the 21 trading days after one,
             against {nextMonth.all.avg_gain_pct?.toFixed(2)}% after any call. A small edge, not a promise. Sell calls had no edge
-            ({nextMonth.sell?.avg_gain_pct?.toFixed(2)}%). <Link href="/track-record" className="text-accent">Full track record</Link>
+            ({nextMonth.sell?.avg_gain_pct?.toFixed(2)}%). <Link href="/track-record" className="text-accent underline underline-offset-2">Full track record</Link>
           </p>
         ) : null}
         {strongest.length ? (
