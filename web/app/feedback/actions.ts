@@ -2,14 +2,29 @@
 
 import { headers } from "next/headers";
 import { DataError, insert } from "@/lib/db";
-import { allowSend, checkFeedback } from "@/lib/feedback";
+import { checkFeedback } from "@/lib/feedback";
 import { VIEWER } from "@/lib/viewer";
 
-// Per visitor, per server instance: a soft limit in front of the database's own
-// 20-an-hour limit, so one script cannot use up the hour for the real reader.
+export type FeedbackState = { status: "idle" | "sent" | "error"; error?: string };
+
+// A first, per-visitor limit before the database's site-wide one (20 an hour), so one
+// misbehaving browser or script cannot use up everyone's allowance. Kept in this server
+// instance's memory: best effort, the database limit is the hard one.
+const WINDOW_MS = 10 * 60_000;
+const PER_VISITOR = 5;
 const recent = new Map<string, number[]>();
 
-export type FeedbackState = { status: "idle" | "sent" | "error"; error?: string };
+function allowedNow(visitor: string, now = Date.now()): boolean {
+  const times = (recent.get(visitor) ?? []).filter((t) => now - t < WINDOW_MS);
+  if (times.length >= PER_VISITOR) {
+    recent.set(visitor, times);
+    return false;
+  }
+  times.push(now);
+  recent.set(visitor, times);
+  if (recent.size > 1000) recent.delete(recent.keys().next().value!);
+  return true;
+}
 
 /** Saves one feedback message. The GitHub feedback workflow then notifies Drabid. */
 export async function sendFeedback(_previous: FeedbackState, form: FormData): Promise<FeedbackState> {
@@ -21,10 +36,11 @@ export async function sendFeedback(_previous: FeedbackState, form: FormData): Pr
   }, VIEWER);
   if (!checked.ok) return { status: "error", error: checked.error };
   if (checked.spam || !checked.row) return { status: "sent" };
+  // Vercel sets x-forwarded-for itself (a visitor cannot forge it there); the first address is the visitor's.
   const h = await headers();
   const visitor = (h.get("x-forwarded-for") ?? "").split(",")[0].trim() || h.get("x-real-ip") || "unknown";
-  if (!allowSend(recent, visitor, Date.now())) {
-    return { status: "error", error: "Several messages were just sent from here. Please wait a few minutes and try again." };
+  if (!allowedNow(visitor)) {
+    return { status: "error", error: "You have sent several messages in the last few minutes. Please wait a little and try again." };
   }
   try {
     await insert("feedback", checked.row);
