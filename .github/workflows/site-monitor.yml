@@ -1,0 +1,50 @@
+name: Site monitor
+
+# Opens the live website and checks it shows what the database holds
+# (scripts/analytics/site_monitor.py). Runs after every production deployment
+# and hourly on trading days. A failed check fails this workflow, and GitHub
+# emails the repository owner. Times are UTC; Nepal is UTC+05:45.
+
+on:
+  deployment_status:
+  schedule:
+    - cron: "50 5-13 * * 1-5"   # hourly, 11:35 to 19:35 Nepal time on weekdays
+    - cron: "20 3 * * *"        # 09:05 Nepal time every day, weekends included
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: site-monitor
+  cancel-in-progress: true
+
+jobs:
+  monitor:
+    # After a deployment, only a successful production deployment is checked
+    # (preview deployments are private).
+    if: >-
+      github.event_name != 'deployment_status' ||
+      (github.event.deployment_status.state == 'success' && contains(github.event.deployment.environment, 'Production'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TZ: Asia/Kathmandu
+      SITE_URL: https://nepse-analyzer-peach.vercel.app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: scripts/analytics/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r scripts/analytics/requirements.txt
+
+      - name: Compare the website with the database
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: python scripts/analytics/site_monitor.py

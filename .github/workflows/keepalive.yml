@@ -22,6 +22,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for wf in market-live.yml market-eod.yml company-details.yml sync-companies.yml analytics-daily.yml backtest-weekly.yml watchdog.yml keepalive.yml; do
+          for wf in market-live.yml market-eod.yml company-details.yml sync-companies.yml analytics-daily.yml backtest-weekly.yml watchdog.yml site-monitor.yml backup-weekly.yml keepalive.yml; do
             gh api -X PUT "repos/${{ github.repository }}/actions/workflows/$wf/enable" && echo "enabled $wf"
           done
