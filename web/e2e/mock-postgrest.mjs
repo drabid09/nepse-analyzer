@@ -40,6 +40,10 @@ companies.push({
   listed_shares: 1e5, paid_up_capital: null, market_cap: null, promoter_pct: null, public_pct: null, nepse_security_id: 999,
 });
 const NOT_TRADED_TODAY = new Set(["NLO"]);
+// SKBBL's details have not been read from NEPSE yet (the details job has not reached it).
+for (const c of companies.filter((x) => x.symbol === "SKBBL")) {
+  Object.assign(c, { isin: null, listing_date: null, face_value: null, listed_shares: null, paid_up_capital: null, market_cap: null, promoter_pct: null, public_pct: null });
+}
 
 function weekdays(end, n) {
   const out = [];
@@ -138,8 +142,19 @@ for (let m = 0; m <= 240; m += 5) {
   const ts = new Date(Date.parse(`${LATEST}T11:00:00+05:45`) + m * 60000).toISOString();
   index_intraday.push({ index_id: 58, ts, value: +(2615 + Math.sin(m / 40) * 6 + m / 30).toFixed(2) });
 }
+// Breadth as the jobs write it since 24 Nov 2026: ordinary shares only, by NEPSE's own day change
+// (last trade). To show that this, not the closing price, is what the Market page uses, the
+// smallest rise counts as unchanged here, as a share whose last trade equalled its previous
+// close would.
+const breadthLatest = (() => {
+  const equity = new Set(companies.filter((c) => c.instrument_type === "Equity").map((c) => c.id));
+  const moves = daily_prices.filter((p) => p.date === LATEST && equity.has(p.company_id) && p.prev_close)
+    .map((p) => p.close / p.prev_close - 1);
+  const up = moves.filter((m) => m > 0).length, down = moves.filter((m) => m < 0).length, same = moves.length - up - down;
+  return { advancers: up - 1, decliners: down, unchanged: same + 1 };
+})();
 const market_daily = [
-  { date: LATEST, turnover: 3.8276e9, traded_shares: 10826913, transactions: 42854, scrips_traded: 360, market_cap: 4.3e12, advancers: 132, decliners: 211, unchanged: 17, is_final: true },
+  { date: LATEST, turnover: 3.8276e9, traded_shares: 10826913, transactions: 42854, scrips_traded: 360, market_cap: 4.3e12, ...breadthLatest, is_final: true },
   { date: PREV, turnover: 3.8876e9, traded_shares: 10000000, transactions: 40000, scrips_traded: 352, market_cap: 4.3e12, advancers: 100, decliners: 200, unchanged: 20, is_final: true },
 ];
 const at = (hhmm, date = LATEST) => new Date(`${date}T${hhmm}:00+05:45`).toISOString();
@@ -151,6 +166,12 @@ const job_runs = [
   id: i + 1, job, trade_date: LATEST, status, started_at: at(hhmm), heartbeat_at: at(hhmm), finished_at: at(hhmm), runner: "github-actions",
   run_url: null, requests: 1, rows_written: 1, message, details: {},
 }));
+// The watchdog stopped reporting 30 hours before the test runs, so it is late at any time of day
+// (hourly on weekday afternoons, daily otherwise); a fixed 11:34 was late only in the afternoon.
+{
+  const stale = new Date(Date.now() - 30 * 3600e3).toISOString();
+  Object.assign(job_runs.find((r) => r.job === "watchdog"), { started_at: stale, heartbeat_at: stale, finished_at: stale });
+}
 const quality_issues = [{ id: 1, trade_date: LATEST, company_id: 12, check_name: "circuit_limit", severity: "error", detail: "API: close beyond NEPSE's 10% daily limit", detected_at: at("15:36") }];
 const backtest_results = [
   ...["buy", "hold", "sell", "all"].map((variant, i) => ({ company_id: null, kind: "strategy", name: "call_next_21_days", variant, period_start: "2023-11-01", period_end: "2026-11-20", sample_size: 1000, hit_rate: 0.55, avg_gain_pct: [1.94, 1.1, 1.03, 1.2][i], avg_loss_pct: null, total_return_pct: null, max_drawdown_pct: null, mae_pct: null, band_coverage_pct: null, reliable: true, note: null, trades: null, computed_at: at("11:44") })),

@@ -28,8 +28,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import (  # noqa: E402
-    NPT, JobError, JobRun, NepseSource, Supabase, company_maps, lookup_company,
-    now_npt, num, previous_index_closes, run, settle_index_prev_close, whole, write_summary,
+    NPT, JobError, JobRun, NepseSource, Supabase, breadth, company_maps, lookup_company,
+    now_npt, num, previous_index_closes, run, settle_index_prev_close, share_ids, whole, write_summary,
 )
 
 INTERVAL = timedelta(minutes=5)
@@ -75,6 +75,7 @@ class Session:
         self.db = db
         self.nepse = nepse
         self.by_security, self.by_symbol = company_maps(db)
+        self.shares = share_ids(db)  # breadth counts ordinary shares only, as NEPSE does
         self.run: JobRun | None = None
         self.last_point: dict[int, tuple] = {}            # company -> (ltp, volume) last written
         self.index_range: dict[int, tuple[float, float]] = {}  # sub-index -> (low, high) seen today
@@ -111,7 +112,7 @@ class Session:
         today = at.date().isoformat()
         ts = at.astimezone(timezone.utc).isoformat()
         prices, points, newest = [], [], None
-        advancers = decliners = unchanged = 0
+        moves: list[dict] = []
         for row in live:
             company_id = lookup_company(row, self.by_security, self.by_symbol)
             volume = whole(row.get("totalTradeQuantity")) or 0
@@ -124,11 +125,8 @@ class Session:
             updated = parse_npt(row.get("lastUpdatedDateTime"))
             if updated and updated.date() == at.date():
                 newest = max(newest, updated) if newest else updated
-            change = num(row.get("percentageChange"))
-            if change is not None:
-                advancers += change > 0
-                decliners += change < 0
-                unchanged += change == 0
+            moves.append({"company_id": company_id, "symbol": row.get("symbol"), "close": ltp, "ltp": ltp,
+                          "prev_close": num(row.get("previousClose")), "change": num(row.get("percentageChange"))})
             prices.append({
                 "company_id": company_id, "date": today,
                 "open": num(row.get("openPrice")), "high": num(row.get("highPrice")),
@@ -171,8 +169,9 @@ class Session:
             self.previous_index = previous_index_closes(self.db, at.date())
         settle_index_prev_close(index_days, self.previous_index)
 
-        market = {"date": today, "advancers": advancers, "decliners": decliners, "unchanged": unchanged,
-                  "is_final": False, **summary_fields(summary)}
+        counts = breadth(moves, self.shares)
+        market = {"date": today, "advancers": counts["advancers"], "decliners": counts["decliners"],
+                  "unchanged": counts["unchanged"], "is_final": False, **summary_fields(summary)}
 
         db = self.db
         if not is_open:

@@ -251,6 +251,12 @@ async function Company({ company }: { company: data.Company }) {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <Title>Company</Title>
+          {[company.market_cap, company.listed_shares, company.paid_up_capital, company.face_value, company.promoter_pct, company.listing_date, company.isin].every((v) => v === null) ? (
+            // Filled in by the daily company details job (never-read shares first): say so instead of a column of dashes.
+            <p className="text-[14px] text-muted rounded-2xl bg-soft px-4 py-3 leading-relaxed">
+              {company.symbol}&apos;s shares, capital and ISIN have not been read from NEPSE yet. A daily job fills them in, companies never read first, so they appear within a day or two.
+            </p>
+          ) : (
           <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-[14px]">
             <dt className="text-muted">Market capitalisation</dt><dd className="num">{rupees(company.market_cap)}</dd>
             <dt className="text-muted">Listed shares</dt><dd className="num">{whole(company.listed_shares)}</dd>
@@ -260,6 +266,7 @@ async function Company({ company }: { company: data.Company }) {
             <dt className="text-muted">Listed on</dt><dd>{day(company.listing_date)}</dd>
             <dt className="text-muted">ISIN</dt><dd className="num">{company.isin ?? "—"}</dd>
           </dl>
+          )}
           <p className="text-[12px] text-faint mt-4">Earnings, P/E and dividends are not shown: there is no verified free source for them yet.</p>
         </Card>
 
