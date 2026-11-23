@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { CallBadge, Card, Change, ScoreBar, Title } from "@/components/ui";
 import { price } from "@/lib/format";
-import { companyHref } from "@/lib/symbol";
+import { companyHref } from "@/lib/symbols";
 import { parseWatchlist, toggleSymbol, WATCHLIST_KEY } from "@/lib/watchlist";
 
 const CHANGED = "nepse-watchlist-changed";
@@ -80,21 +80,17 @@ export function StarButton({ symbol, label = false }: { symbol: string; label?: 
 export type WatchRow = {
   symbol: string; name: string; close: number | null; change: number | null; call: string | null; dataOk: boolean;
   score: number | null; low: number | null; high: number | null;
-  /** Set when the price is not from the latest trading day (the company did not trade). */
-  asOf?: string | null;
 };
 
 /** The "Your stocks" card on the Market page. */
 export function YourStocks({ rows, viewer }: { rows: WatchRow[]; viewer: string }) {
   const { list, mounted } = useWatchlist();
-  // The stars live in this browser, so the server cannot know them. It renders a placeholder
-  // the size of the hint below, so the page does not jump when the browser fills it in.
-  if (!mounted) return <div aria-hidden className="min-h-[76px] sm:min-h-[52px] rounded-2xl border border-line bg-card" />;
+  if (!mounted) return null;
   const bySymbol = new Map(rows.map((r) => [r.symbol, r]));
   const mine = list.map((s) => bySymbol.get(s)).filter((r): r is WatchRow => Boolean(r));
   if (!mine.length) {
     return (
-      <p className="min-h-[76px] sm:min-h-[52px] rounded-2xl bg-card border border-line px-4 py-3 text-[14px] text-muted leading-relaxed">
+      <p className="rounded-2xl bg-card border border-line px-4 py-3 text-[14px] text-muted leading-relaxed">
         <span className="inline-flex align-middle text-warn mr-1.5"><StarIcon on size={15} /></span>
         {viewer}, tap the star on any company page or in <Link href="/signals" className="text-accent underline underline-offset-2">Signals</Link> to
         pin it here as Your stocks, with its price, today&apos;s change and call.
@@ -122,12 +118,12 @@ export function YourStocks({ rows, viewer }: { rows: WatchRow[]; viewer: string 
                 <tr key={r.symbol} className="border-t border-line">
                   <td className="px-2 py-2.5">
                     <span className="inline-flex items-center gap-2">
-                      <Link href={companyHref(r.symbol)} prefetch={false} className="font-semibold hover:text-accent">{r.symbol}</Link>
+                      <Link href={companyHref(r.symbol)} className="font-semibold hover:text-accent">{r.symbol}</Link>
                       <StarButton symbol={r.symbol} />
                     </span>
                     <div className="text-[12px] text-muted truncate max-w-[200px]">{r.name}</div>
                   </td>
-                  <td className="px-2 py-2.5 text-right num">{price(r.close)}{r.asOf ? <div className="text-[11px] text-faint">{r.asOf}</div> : null}</td>
+                  <td className="px-2 py-2.5 text-right num">{price(r.close)}</td>
                   <td className="px-2 py-2.5 text-right"><Change value={r.change} /></td>
                   <td className="px-2 py-2.5">{r.call ? <CallBadge call={r.call} dataOk={r.dataOk} /> : <span className="text-faint">—</span>}</td>
                   <td className="px-2 py-2.5 hidden sm:table-cell">{r.score !== null ? <ScoreBar score={r.score} /> : <span className="text-faint">—</span>}</td>
