@@ -4,9 +4,11 @@ name: Sync companies from NEPSE
 # Uses the service key, so it runs only in this repository's own Actions.
 
 on:
+  schedule:
+    - cron: "17 3 * * 0"   # Sundays 09:02 Nepal time: new listings, renamed or delisted securities
   workflow_dispatch:
   push:
-    branches: ["phase-1/**"]
+    branches: ["phase-1/**", "phase-2/**"]
     paths:
       - "scripts/ingest/sync_companies.py"
       - "scripts/ingest/common.py"
