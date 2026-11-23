@@ -19,6 +19,7 @@ const JOBS: Record<string, [string, string]> = {
   details: ["Company details", "About 110 companies a day"],
   companies: ["Company list", "Sundays"],
   backfill: ["History import", "One-time"],
+  timer: ["Timer", "Starts the jobs above on time, from Supabase; checked hourly"],
 };
 
 function tone(status: string) {
