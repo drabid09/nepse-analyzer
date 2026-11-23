@@ -1,0 +1,56 @@
+name: Live market (trading hours)
+
+# One run covers a whole trading session: it starts before the 11:00 open,
+# takes a snapshot every 5 minutes and exits after the 15:00 close.
+# Times below are UTC; Nepal is UTC+05:45.
+#
+# Scheduled runs only start from the default branch, and GitHub can start them
+# late or skip them when busy, so there are two backups. A backup that starts
+# while the session's run is still going waits in the queue and then exits,
+# because by then the session is over.
+
+on:
+  schedule:
+    - cron: "52 4 * * 1-5"    # 10:37 Nepal time: main run, waits for the open
+    - cron: "12 6 * * 1-5"    # 11:57 backup
+    - cron: "42 7 * * 1-5"    # 13:27 backup
+  workflow_dispatch:
+  push:
+    branches: ["phase-2/**"]
+    paths:
+      - "scripts/ingest/live_market.py"
+      - "scripts/ingest/common.py"
+      - ".github/workflows/market-live.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: market-live
+  # New code pushed during a session replaces the running copy; scheduled
+  # backups never interrupt it.
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      TZ: Asia/Kathmandu   # the NEPSE library builds its request ids from today's date
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: scripts/ingest/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r scripts/ingest/requirements.txt
+
+      - name: Follow the session
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: python scripts/ingest/live_market.py
