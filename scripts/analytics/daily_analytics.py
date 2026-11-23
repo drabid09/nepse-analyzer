@@ -280,6 +280,8 @@ def analyse(db: Supabase, trade_date: date, issues: Issues) -> dict:
     if len(companies) < 100:
         raise JobError(f"only {len(companies)} tradable equities found; companies table looks incomplete")
     facts = check_data(db, trade_date, companies, issues)
+    # The day's issues are recomputed on every run, so one that has been fixed disappears.
+    db.delete("quality_issues", trade_date=f"eq.{trade_date.isoformat()}")
     if issues.rows:
         db.upsert("quality_issues", issues.rows, on_conflict="trade_date,company_id,check_name")
     market_errors = issues.market_errors()
