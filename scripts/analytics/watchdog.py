@@ -16,7 +16,9 @@ Checks:
   * no job failed in the last 26 hours, and no run is stuck;
   * the backtest is less than 8 days old;
   * no market-wide data error is open for the latest trading day;
-  * the database is below 400 MB of the free plan's 500 MB.
+  * the database is below 400 MB of the free plan's 500 MB;
+  * the Supabase timer is starting jobs: its latest hourly check passed and is
+    under 3 hours old.
 """
 
 from __future__ import annotations
@@ -32,12 +34,25 @@ from common import JobError, JobRun, Supabase, now_npt, run, write_summary  # no
 LIVE_STALE = timedelta(minutes=15)
 STUCK = timedelta(minutes=30)
 STORAGE_LIMIT_MB = 400
+TIMER_SILENT = timedelta(hours=3)
 
 
 def parse_ts(text: str | None) -> datetime | None:
     if not text:
         return None
     return datetime.fromisoformat(text.replace("Z", "+00:00"))
+
+
+def timer_state(latest: dict | None, utc_now: datetime) -> tuple[bool, str, str] | None:
+    """(ok, good text, bad text) for the Supabase timer's latest check, if it has run."""
+    if not latest:
+        return None
+    beat = parse_ts(latest["heartbeat_at"])
+    if latest["status"] != "ok":
+        return False, "", f"the Supabase timer cannot start jobs: {latest['message'] or 'no detail'}"
+    if utc_now - beat > TIMER_SILENT:
+        return False, "", f"the Supabase timer has not checked in for {int((utc_now - beat).total_seconds() // 3600)} hours"
+    return True, "the Supabase timer is starting jobs", ""
 
 
 def main() -> None:
@@ -82,13 +97,19 @@ def main() -> None:
         return any(r["job"] == failure["job"] and r["started_at"] > failure["started_at"]
                    and r["status"] in ("ok", "partial", "holiday", "skipped") for r in recent)
 
-    failed = [r for r in recent if r["status"] == "failed" and r["job"] != "watchdog" and not resolved(r)]
+    # The timer has its own check below.
+    failed = [r for r in recent if r["status"] == "failed" and r["job"] not in ("watchdog", "timer") and not resolved(r)]
     check(not failed, "no unresolved failed runs in the last 26 hours",
           "failed runs: " + "; ".join(f"{r['job']} at {parse_ts(r['started_at']).astimezone(now.tzinfo):%d %b %H:%M}: {(r['message'] or '')[:120]}" for r in failed[:5]))
 
     stuck = [r for r in recent if r["status"] == "running" and utc_now - parse_ts(r["heartbeat_at"]) > STUCK]
     check(not stuck, "no stuck runs", "runs still marked running with no heartbeat for 30 minutes: "
           + ", ".join(f"{r['job']} #{r['id']}" for r in stuck))
+
+    timer = timer_state(next(iter(db.select("job_runs", select="status,message,heartbeat_at", job="eq.timer",
+                                            order="started_at.desc", limit=1)), None), utc_now)
+    if timer:
+        check(*timer)
 
     backtests = db.select("job_runs", select="started_at", job="eq.backtest", status="eq.ok", order="started_at.desc", limit=1)
     if backtests:
