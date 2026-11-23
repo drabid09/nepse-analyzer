@@ -2,7 +2,7 @@
 
 Next.js (App Router, TypeScript, Tailwind) site for the NEPSE analyzer. Deployed on Vercel with this folder (`web/`) as the project root.
 
-It only reads: every query runs on the server with the Supabase project's publishable key, which row level security limits to reading. Pages are re-rendered at most once a minute and refresh themselves in the browser every minute during trading hours.
+It only reads: every query runs on the server with the Supabase project's publishable key, which row level security limits to reading. Pages are re-rendered at most once a minute and refresh themselves in the browser every minute during trading hours, and at once if the copy on screen is more than 90 seconds old.
 
 ## Environment variables (Vercel project settings)
 
@@ -20,10 +20,15 @@ It only reads: every query runs on the server with the Supabase project's publis
 | `/c/SYMBOL` | Chart (adjusted or raw) with trade levels, call and reasons, price ranges, company track record, indicators, company facts, floorsheet summary, adjustments and data checks |
 | `/track-record` | Backtest of the calls and ranges, and the live record of published ranges |
 | `/health` | Each job's last run, data checks, recent runs |
+| `/guide` | Plain-language guide: what calls, scores, levels and ranges mean, and a check before buying or selling |
 
 ## Run locally
 
 ```
 npm ci
 SUPABASE_URL=... SUPABASE_ANON_KEY=... npm run dev
+npm test            # freshness rules, formatting, key guard
+npm run typecheck
 ```
+
+The website refuses to run with a secret or service_role key. Reads that change once a day are reused for 10 minutes and price history for 15, to stay well inside Supabase's free data transfer (see `docs/phase5-quality.md`).
