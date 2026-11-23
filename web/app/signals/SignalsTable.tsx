@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { RESELECT_EVENT } from "@/components/client";
 import { CallBadge, Change, ScoreBar, Trend } from "@/components/ui";
 import { StarButton, useWatchlist } from "@/components/watchlist";
 import {
@@ -39,17 +40,50 @@ function useUrlFilters(sectors: readonly string[]) {
     return () => window.removeEventListener("popstate", read);
   }, []);
 
-  // Write it back, debounced so typing in the filter does not rewrite history on every key.
+  // Write it back, debounced so typing in the filter does not rewrite history on every key
+  // (Safari also refuses more than 100 history rewrites in 30 seconds).
+  const pending = useRef<string | null>(null);
+  const write = useCallback(() => {
+    const search = pending.current;
+    pending.current = null;
+    if (search !== null && search !== window.location.search) {
+      window.history.replaceState(null, "", `${window.location.pathname}${search}${window.location.hash}`);
+    }
+  }, []);
   useEffect(() => {
     if (!restored.current) return;
-    const id = window.setTimeout(() => {
-      const search = filtersToSearch(filters);
-      if (search !== window.location.search) {
-        window.history.replaceState(null, "", `${window.location.pathname}${search}${window.location.hash}`);
-      }
-    }, 250);
+    pending.current = filtersToSearch(filters);
+    const id = window.setTimeout(write, 250);
     return () => window.clearTimeout(id);
-  }, [filters]);
+  }, [filters, write]);
+
+  // Opening a company right after choosing a filter (inside the 250 ms) used to leave the old
+  // address behind, so Back showed every company again. Any link click, and leaving or
+  // refreshing the page, writes the pending filters first. Capture phase: before the link
+  // starts its navigation.
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (pending.current !== null && e.target instanceof Element && e.target.closest("a[href]")) write();
+    };
+    window.addEventListener("click", onClick, true);
+    window.addEventListener("pagehide", write);
+    return () => {
+      window.removeEventListener("click", onClick, true);
+      window.removeEventListener("pagehide", write);
+    };
+  }, [write]);
+
+  // Pressing the Signals tab while on Signals opens the plain /signals address; the table is
+  // the same component, so it must drop its filters too or it would no longer match the address.
+  useEffect(() => {
+    const onReselect = (e: Event) => {
+      if ((e as CustomEvent<string>).detail !== window.location.pathname) return;
+      pending.current = null;
+      setFilters(DEFAULTS);
+    };
+    window.addEventListener(RESELECT_EVENT, onReselect);
+    return () => window.removeEventListener(RESELECT_EVENT, onReselect);
+  }, []);
 
   const update = useCallback((change: Partial<Filters>) => setFilters((f) => ({ ...f, ...change })), []);
   return { filters, update, reset: () => setFilters(DEFAULTS) };

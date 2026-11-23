@@ -4,12 +4,15 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { ago } from "@/lib/format";
+import { refreshEvery } from "@/lib/market";
+import { pickOnEnter, searchCompanies } from "@/lib/search";
 import { companyHref } from "@/lib/symbol";
 
 /**
- * Keeps an open page current: re-reads it from the server every minute during trading hours (and
- * while the database is not answering) and every 10 minutes otherwise, and when coming back to the
- * tab or phone after a while.
+ * Keeps an open page current: re-reads it from the server every minute while prices or calls can
+ * change (the session, and weekdays until 16:45 while the final prices and the day's calls arrive:
+ * lib/market.ts refreshEvery) and while the database is not answering, every 10 minutes otherwise,
+ * and when coming back to the tab or phone after a while.
  *
  * Pages are served from a cache that hands out the previous copy while it makes a new one. So when
  * a copy older than 90 seconds arrives (the first visit after a quiet spell, coming back to a tab,
@@ -45,7 +48,7 @@ export function AutoRefresh({ open, renderedAt }: { open: boolean; renderedAt: s
         router.refresh();
       }
     };
-    const id = setInterval(() => refreshIfOld(open ? 55_000 : 590_000), 15_000);
+    const id = setInterval(() => refreshIfOld(refreshEvery(open)), 15_000);
     const onVisible = () => refreshIfOld(60_000);
     document.addEventListener("visibilitychange", onVisible);
     return () => {
@@ -55,6 +58,30 @@ export function AutoRefresh({ open, renderedAt }: { open: boolean; renderedAt: s
   }, [open, renderedAt, router]);
   return null;
 }
+
+/**
+ * Shown with "Data temporarily unavailable": asks the server again every 20 seconds for two
+ * minutes, then every minute, while the page is on screen. That copy is new, so AutoRefresh would
+ * otherwise wait up to 10 minutes (outside trading) before trying again after the database recovers.
+ * (The unavailable copy itself is cached for up to a minute, so the first answers can still be it.)
+ */
+export function RetrySoon() {
+  const router = useRouter();
+  useEffect(() => {
+    const started = Date.now();
+    let id: number;
+    const again = () => {
+      if (document.visibilityState === "visible") router.refresh();
+      id = window.setTimeout(again, Date.now() - started < 120_000 ? 20_000 : 60_000);
+    };
+    id = window.setTimeout(again, 20_000);
+    return () => window.clearTimeout(id);
+  }, [router]);
+  return null;
+}
+
+/** Fired when the tab for the page already on screen is pressed (e.g. Signals while on Signals). */
+export const RESELECT_EVENT = "nepse:nav-reselect";
 
 /**
  * A visible note when the copy on screen is old and refreshing has not replaced it, which is
@@ -106,6 +133,8 @@ export function Nav() {
         const active = href === "/" ? path === "/" : path.startsWith(href);
         return (
           <Link key={href} href={href} aria-current={active ? "page" : undefined}
+            // Same page, same component: it would keep its filters while the address drops them.
+            onClick={() => { if (path === href) window.dispatchEvent(new CustomEvent(RESELECT_EVENT, { detail: href })); }}
             className={`whitespace-nowrap rounded-full px-2 sm:px-3 py-1.5 text-[13.5px] sm:text-[14px] ${active ? "bg-ink text-bg font-medium" : "text-muted hover:text-ink"}`}>
             <span className="sm:hidden">{short}</span><span className="hidden sm:inline">{label}</span>
           </Link>
@@ -121,14 +150,10 @@ export function SearchBox({ companies }: { companies: { symbol: string; name: st
   const [active, setActive] = useState(0);
   const router = useRouter();
   const box = useRef<HTMLDivElement>(null);
-  const term = useDeferredValue(q).trim().toLowerCase();
-  const results = useMemo(() => {
-    if (!term) return [];
-    const exact = companies.filter((c) => c.symbol.toLowerCase() === term);
-    const starts = companies.filter((c) => c.symbol.toLowerCase() !== term && c.symbol.toLowerCase().startsWith(term));
-    const rest = companies.filter((c) => !c.symbol.toLowerCase().startsWith(term) && (c.symbol.toLowerCase().includes(term) || c.name.toLowerCase().includes(term)));
-    return [...exact, ...starts, ...rest].slice(0, 8);
-  }, [term, companies]);
+  // The list follows the box a moment later so typing stays smooth on a slow phone; Enter uses
+  // what is typed now (pickOnEnter), never a list that is a keystroke behind.
+  const deferred = useDeferredValue(q);
+  const results = useMemo(() => searchCompanies(companies, deferred), [deferred, companies]);
   const shown = open && results.length > 0;
 
   useEffect(() => {
@@ -162,7 +187,7 @@ export function SearchBox({ companies }: { companies: { symbol: string; name: st
         onKeyDown={(e) => {
           if (e.key === "ArrowDown" && results.length) { e.preventDefault(); setOpen(true); setActive((i) => (i + 1) % results.length); }
           else if (e.key === "ArrowUp" && results.length) { e.preventDefault(); setActive((i) => (i - 1 + results.length) % results.length); }
-          else if (e.key === "Enter") { e.preventDefault(); const pick = results[Math.min(active, results.length - 1)]; if (pick) go(pick.symbol); }
+          else if (e.key === "Enter") { e.preventDefault(); const pick = pickOnEnter(companies, e.currentTarget.value, deferred, results, active); if (pick) go(pick.symbol); }
           else if (e.key === "Escape") setOpen(false);
         }}
         placeholder="Search a company or symbol"

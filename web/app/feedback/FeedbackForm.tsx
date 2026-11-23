@@ -1,11 +1,32 @@
 "use client";
 
-import { useRef, useState, useTransition, type FormEvent } from "react";
+import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { ABOUT_MAX, KINDS, MESSAGE_MAX } from "@/lib/feedback";
 import { BUILDER, VIEWER } from "@/lib/viewer";
 import { sendFeedback, type FeedbackState } from "./actions";
 
 const START: FeedbackState = { status: "idle" };
+
+// The message being written survives a refresh, Back or a closed tab in this browser session
+// (sessionStorage: never sent anywhere, gone when the browser is closed), and is cleared once sent.
+const DRAFT_KEY = (about: string) => `nepse-feedback-draft:${about.slice(0, 60)}`;
+type Draft = { kind: string; message: string; topic: string };
+function readDraft(about: string): Draft | null {
+  try {
+    const d = JSON.parse(window.sessionStorage.getItem(DRAFT_KEY(about)) ?? "null");
+    return d && typeof d.message === "string" && typeof d.kind === "string" && typeof d.topic === "string" ? d : null;
+  } catch {
+    return null;
+  }
+}
+function saveDraft(about: string, d: Draft | null) {
+  try {
+    if (d && d.message.trim()) window.sessionStorage.setItem(DRAFT_KEY(about), JSON.stringify(d));
+    else window.sessionStorage.removeItem(DRAFT_KEY(about));
+  } catch {
+    // storage blocked (private window): the draft simply is not kept
+  }
+}
 
 /** One message at a time: "Send another" starts a fresh form. */
 export function FeedbackForm({ about }: { about: string }) {
@@ -20,6 +41,21 @@ function OneMessage({ about, onAnother }: { about: string; onAnother: () => void
   const [kind, setKind] = useState<string>(KINDS[0].id);
   const [message, setMessage] = useState("");
   const [topic, setTopic] = useState(about);
+  const restored = useRef(false);
+
+  // Restore after mounting (the server cannot know the draft), then keep it up to date.
+  useEffect(() => {
+    const d = readDraft(about);
+    if (d) {
+      if (KINDS.some((k) => k.id === d.kind)) setKind(d.kind);
+      setMessage(d.message.slice(0, MESSAGE_MAX));
+      setTopic(d.topic.slice(0, ABOUT_MAX));
+    }
+    restored.current = true;
+  }, [about]);
+  useEffect(() => {
+    if (restored.current && state.status !== "sent") saveDraft(about, { kind, message, topic });
+  }, [about, kind, message, topic, state.status]);
 
   // Sent by hand rather than through <form action>: React clears a form after an action,
   // which would wipe a long message when sending fails. A lost connection becomes a
@@ -31,7 +67,9 @@ function OneMessage({ about, onAnother }: { about: string; onAnother: () => void
     const form = new FormData(e.currentTarget);
     startTransition(async () => {
       try {
-        setState(await sendFeedback(state, form));
+        const result = await sendFeedback(state, form);
+        if (result.status === "sent") saveDraft(about, null);
+        setState(result);
       } catch {
         setState({ status: "error", error: "No connection just now. Your message is still here: please try again." });
       } finally {

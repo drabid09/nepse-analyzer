@@ -101,6 +101,34 @@ export function jobLate(job: string, heartbeatAt: string | null | undefined, now
 }
 
 /**
+ * How often an open page re-reads itself. Every minute while prices or calls can change:
+ * during the session, and on weekdays until 16:45, when the final prices (about 15:20) and
+ * the day's calls (about 15:50) arrive. Every 10 minutes otherwise. Judged from the
+ * visitor's clock, so a page served from the cache never keeps an old rhythm.
+ */
+export function refreshEvery(open: boolean, now = new Date()): number {
+  const { minutes, weekday } = nepalNow(now);
+  const busy = open || (weekday && minutes >= 10 * 60 + 30 && minutes < 16 * 60 + 45);
+  return busy ? 55_000 : 590_000;
+}
+
+/**
+ * Market breadth over ordinary shares, as NEPSE and the news report it. Counting every
+ * traded security (debentures, mutual funds, promoter shares) gave 132 up and 211 down on
+ * 23 Nov 2026, when the reported figures were 105 and 165.
+ */
+export function breadth(changes: readonly (number | null)[]) {
+  let up = 0, down = 0, same = 0;
+  for (const c of changes) {
+    if (c === null || !Number.isFinite(c)) continue;
+    if (c > 0) up++;
+    else if (c < 0) down++;
+    else same++;
+  }
+  return { up, down, same, total: up + down + same };
+}
+
+/**
  * The one-line market status under the greeting. Pure, so every case is tested
  * (lib/market.test.ts). `dayLabel` formats a date for display.
  */

@@ -140,12 +140,15 @@ export default function GuidePage() {
             any company page, or next to a company in Signals, to add it. Stars are saved on the phone or computer you use.</li>
           <li><b className="text-ink">NEPSE Index.</b> The big number is the index now (or at the close), with today&apos;s change in green or red,
             and the line shows how it moved through the day. <L>live</L> after the date means the session is still on.</li>
-          <li><b className="text-ink">Market.</b> <L>Turnover</L> is the total value traded today, in lakh or crore. <L>Advancing</L> and
-            {" "}<L>Declining</L> count companies up and down: more advancing than declining means a broadly positive day.</li>
-          <li><b className="text-ink">Sectors.</b> Today&apos;s change for each sector index, best first. It shows where money is moving.</li>
+          <li><b className="text-ink">Market.</b> <L>Turnover</L> is the total value traded today, in lakh or crore. <L>Shares rising</L> and
+            {" "}<L>Shares falling</L> count companies whose shares went up and down, as NEPSE and the news report it: more rising than
+            falling means a broadly positive day. <L>Securities traded</L> also counts mutual funds, debentures and promoter shares.</li>
+          <li><b className="text-ink">Sectors.</b> The change of each sector index on the day shown, best first. It shows where money is moving.</li>
           <li><b className="text-ink">Strongest buy calls.</b> The ten highest scores from the last close. The blue box above the list says
             how much buy calls have been worth in the past; read it once.</li>
-          <li><b className="text-ink">Top gainers and Top losers.</b> The biggest moves of the day, shares only.</li>
+          <li><b className="text-ink">Top gainers and Top losers.</b> The biggest moves of the day, shares only. <L>data check failed</L> under a
+            price means the day&apos;s own checks found it doubtful (for example a move beyond NEPSE&apos;s 10% daily limit): that company
+            gets no call until it is resolved.</li>
         </Steps>
       </Section>
 

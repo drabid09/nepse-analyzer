@@ -6,7 +6,7 @@ import { configured } from "@/lib/db";
 import { Setup, Unavailable } from "@/components/states";
 import { YourStocks, type WatchRow } from "@/components/watchlist";
 import { change, day, num, price, rupees, whole } from "@/lib/format";
-import { statusLine } from "@/lib/market";
+import { breadth, statusLine } from "@/lib/market";
 import { companyHref } from "@/lib/symbol";
 import { VIEWER } from "@/lib/viewer";
 
@@ -32,6 +32,12 @@ async function Market() {
   const live = prices.rows.length > 0 && prices.rows.some((p) => !p.is_final);
 
   const equities = prices.rows.filter((p) => c.byId.get(p.company_id)?.instrument_type === "Equity" && p.prev_close);
+  // Rising and falling counted over ordinary shares, as NEPSE reports it; market_daily counts every
+  // traded security (debentures, mutual funds, promoter shares). Only when both are the same day.
+  const shares = today && today.date === prices.date ? breadth(equities.map((p) => change(p.close, p.prev_close))) : null;
+  // A price that failed the day's own data check (e.g. beyond NEPSE's 10% daily limit) is still
+  // shown, but marked, so a doubtful number never heads a list unannounced.
+  const flagged = new Set(signals.filter((s) => !s.data_ok && s.date === prices.date).map((s) => s.company_id));
   const movers = equities.map((p) => ({ p, ch: change(p.close, p.prev_close) ?? 0 })).sort((a, b) => b.ch - a.ch);
   // Only real gainers and losers: on a broad up day the "losers" list must not fill up with risers.
   const gainers = movers.filter((m) => m.ch > 0).slice(0, 6), losers = movers.filter((m) => m.ch < 0).slice(-6).reverse();
@@ -101,15 +107,15 @@ async function Market() {
             <Stat label="Turnover" value={rupees(today?.turnover)} />
             <Stat label="Transactions" value={whole(today?.transactions)} />
             <Stat label="Shares traded" value={whole(today?.traded_shares)} />
-            <Stat label="Companies traded" value={whole(today?.scrips_traded)} />
-            <Stat label="Advancing" value={whole(today?.advancers)} tone="up" />
-            <Stat label="Declining" value={whole(today?.decliners)} tone="down" />
+            <Stat label="Securities traded" value={whole(today?.scrips_traded)} note="shares, funds and debentures" />
+            <Stat label="Shares rising" value={whole(shares?.up)} tone="up" note={shares ? `of ${whole(shares.total)} companies` : undefined} />
+            <Stat label="Shares falling" value={whole(shares?.down)} tone="down" note={shares ? `${whole(shares.same)} unchanged` : undefined} />
           </div>
         </Card>
       </div>
 
       <Card>
-        <Title sub="Today's change of each NEPSE index">Sectors</Title>
+        <Title sub={idx.date ? `Change of each NEPSE index on ${day(idx.date)}${idx.rows.some((r) => !r.is_final) ? ", so far" : ""}` : undefined}>Sectors</Title>
         {idx.rows.length ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {idx.rows.filter((r) => r.index_id !== 58).sort((a, b) => (change(b.close, b.prev_close) ?? 0) - (change(a.close, a.prev_close) ?? 0)).map((r) => (
@@ -180,7 +186,10 @@ async function Market() {
                   return (
                     <li key={p.company_id} className="flex items-center justify-between py-2.5 text-[14px]">
                       <Link href={co ? companyHref(co.symbol) : "/signals"} prefetch={false} className="min-w-0"><span className="font-semibold">{co?.symbol}</span><span className="block text-[12px] text-muted truncate">{co?.name}</span></Link>
-                      <span className="text-right"><span className="num block">{price(p.close)}</span><Change value={ch} /></span>
+                      <span className="text-right">
+                        <span className="num block">{price(p.close)}</span><Change value={ch} />
+                        {flagged.has(p.company_id) ? <span className="block text-[11px] text-warn">data check failed</span> : null}
+                      </span>
                     </li>
                   );
                 })}

@@ -30,6 +30,10 @@ export function keyProblem(key: string): string | null {
 }
 
 const TIMEOUT_MS = 10_000;
+const RETRY_DELAY_MS = 400;
+/** Gateway answers that usually pass within a second. 4xx and other errors are not retried. */
+const TRANSIENT = new Set([502, 503, 504, 520, 521, 522, 523, 524]);
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type Params = Record<string, string | number | undefined>;
 
@@ -79,16 +83,34 @@ export async function rest<T>(table: string, params: Params = {}, options: { rev
   const page = 1000;
   const rows: T[] = [];
   for (let start = 0; ; start += page) {
+    const read = () => fetch(`${base}/rest/v1/${table}?${query}`, {
+      headers: options.all ? { ...headers, "Range-Unit": "items", Range: `${start}-${start + page - 1}` } : headers,
+      next: { revalidate: options.revalidate ?? 60 },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
     let response: Response;
     try {
-      response = await fetch(`${base}/rest/v1/${table}?${query}`, {
-        headers: options.all ? { ...headers, "Range-Unit": "items", Range: `${start}-${start + page - 1}` } : headers,
-        next: { revalidate: options.revalidate ?? 60 },
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      });
+      response = await read();
+      // A brief hiccup (gateway error) is read again once: one failed read out of the ten a page
+      // makes would otherwise replace the whole page with "unavailable" for everyone for a minute.
+      if (TRANSIENT.has(response.status)) {
+        await response.body?.cancel().catch(() => {});
+        await sleep(RETRY_DELAY_MS);
+        response = await read();
+      }
     } catch (error) {
-      const reason = error instanceof Error && error.name === "TimeoutError" ? `no answer within ${TIMEOUT_MS / 1000} s` : "network error";
-      throw new DataError(`Database did not answer a read of ${table} (${reason}). It may be paused or busy.`);
+      const timedOut = error instanceof Error && error.name === "TimeoutError";
+      // A dropped connection is retried once too; a timeout is not (it would double the wait).
+      let retried: Response | null = null;
+      if (!timedOut) {
+        await sleep(RETRY_DELAY_MS);
+        retried = await read().catch(() => null);
+      }
+      if (!retried) {
+        const reason = timedOut ? `no answer within ${TIMEOUT_MS / 1000} s` : "network error";
+        throw new DataError(`Database did not answer a read of ${table} (${reason}). It may be paused or busy.`);
+      }
+      response = retried;
     }
     if (!response.ok) {
       const text = await response.text().catch(() => "");

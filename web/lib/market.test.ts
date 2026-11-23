@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { freshness, jobLate, nepalNow, statusLine } from "./market.ts";
+import { breadth, freshness, jobLate, nepalNow, refreshEvery, statusLine } from "./market.ts";
 
 // Nepal time is UTC+05:45.
 const npt = (date: string, hhmm: string) => new Date(`${date}T${hhmm}:00+05:45`);
@@ -134,4 +134,19 @@ test("jobs that stop reporting are marked late", () => {
   assert.equal(jobLate("watchdog", npt(FRI, "18:05").toISOString(), npt(SAT, "12:00")), null);
   assert.equal(jobLate("live", npt(FRI, "15:05").toISOString(), npt(MON, "16:45")), null);
   assert.equal(jobLate("timer", null, npt(MON, "16:45")), null);
+});
+
+test("open pages re-read every minute while prices or calls can still change", () => {
+  assert.equal(refreshEvery(true, npt(MON, "12:00")), 55_000);
+  // After the close the final prices (~15:20) and calls (~15:50) still arrive.
+  assert.equal(refreshEvery(false, npt(MON, "15:30")), 55_000);
+  assert.equal(refreshEvery(false, npt(MON, "16:40")), 55_000);
+  assert.equal(refreshEvery(false, npt(MON, "16:50")), 590_000);
+  assert.equal(refreshEvery(false, npt(MON, "09:00")), 590_000);
+  assert.equal(refreshEvery(false, npt(SAT, "15:30")), 590_000);
+});
+
+test("breadth counts rising, falling and unchanged, skipping unknown changes", () => {
+  assert.deepEqual(breadth([1.2, -0.5, 0, null, Number.NaN, 3, -2]), { up: 2, down: 2, same: 1, total: 5 });
+  assert.deepEqual(breadth([]), { up: 0, down: 0, same: 0, total: 0 });
 });
