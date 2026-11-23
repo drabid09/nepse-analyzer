@@ -6,8 +6,8 @@ import { configured } from "@/lib/db";
 import { Setup, Unavailable } from "@/components/states";
 import { YourStocks, type WatchRow } from "@/components/watchlist";
 import { change, day, num, price, rupees, whole } from "@/lib/format";
-import { statusLine } from "@/lib/market";
-import { companyHref } from "@/lib/symbol";
+import { companyHref } from "@/lib/symbols";
+import { statusLine, topMovers } from "@/lib/market";
 import { VIEWER } from "@/lib/viewer";
 
 export const revalidate = 60;
@@ -32,9 +32,7 @@ async function Market() {
   const live = prices.rows.length > 0 && prices.rows.some((p) => !p.is_final);
 
   const equities = prices.rows.filter((p) => c.byId.get(p.company_id)?.instrument_type === "Equity" && p.prev_close);
-  const movers = equities.map((p) => ({ p, ch: change(p.close, p.prev_close) ?? 0 })).sort((a, b) => b.ch - a.ch);
-  // Only real gainers and losers: on a broad up day the "losers" list must not fill up with risers.
-  const gainers = movers.filter((m) => m.ch > 0).slice(0, 6), losers = movers.filter((m) => m.ch < 0).slice(-6).reverse();
+  const { gainers, losers } = topMovers(equities.map((p) => ({ row: p, change: change(p.close, p.prev_close) })));
 
   const rangeBy = new Map(ranges.map((r) => [r.company_id, r]));
   const priceBy = new Map(prices.rows.map((p) => [p.company_id, p]));
@@ -45,19 +43,16 @@ async function Market() {
   const indexName = new Map(indexInfo.map((i) => [i.id, i.name]));
   const nepseChange = nepseDay ? change(nepseDay.close, nepseDay.prev_close) : null;
 
-  // Every company's latest numbers, for the stars this browser has saved ("Your stocks"). A
-  // company that did not trade on the latest day has no price row that day; it still appears,
-  // with its last close from the call, so a star never silently disappears.
+  // Every company's latest numbers, for the stars this browser has saved ("Your stocks").
   const signalBy = new Map(signals.map((s) => [s.company_id, s]));
-  const ids = new Set<number>([...prices.rows.map((p) => p.company_id), ...signals.map((s) => s.company_id)]);
-  const watchRows: WatchRow[] = [...ids].flatMap((id) => {
-    const co = c.byId.get(id);
+  const watchRows: WatchRow[] = prices.rows.flatMap((p) => {
+    const co = c.byId.get(p.company_id);
     if (!co) return [];
-    const p = priceBy.get(id), s = signalBy.get(id), r = rangeBy.get(id);
+    const s = signalBy.get(p.company_id), r = rangeBy.get(p.company_id);
     return [{
-      symbol: co.symbol, name: co.name, close: num(p?.close ?? s?.close), change: p ? change(p.close, p.prev_close) : null,
+      symbol: co.symbol, name: co.name, close: num(p.close), change: change(p.close, p.prev_close),
       call: s ? (s.data_ok ? s.recommendation : "avoid") : null, dataOk: s?.data_ok ?? true, score: s ? s.score : null,
-      low: num(r?.low), high: num(r?.high), asOf: p ? null : s ? `close of ${day(s.date)}` : null,
+      low: num(r?.low), high: num(r?.high),
     }];
   });
 
@@ -82,7 +77,7 @@ async function Market() {
               <div className="num text-[40px] sm:text-[48px] font-semibold tracking-tight leading-tight mt-1">{price(nepseDay?.close)}</div>
               <div className="text-[17px] mt-0.5">
                 <Change value={nepseChange} />{" "}
-                <span className="text-muted text-[14px] num">{nepseDay?.prev_close ? (() => { const pts = num(nepseDay.close)! - num(nepseDay.prev_close)!; return `(${pts > 0 ? "+" : ""}${pts.toFixed(2)})`; })() : ""}</span>
+                <span className="text-muted text-[14px] num">{nepseDay?.prev_close ? `(${(num(nepseDay.close)! - num(nepseDay.prev_close)!).toFixed(2)})` : ""}</span>
               </div>
             </div>
             {nepseDay?.high ? (
@@ -132,12 +127,11 @@ async function Market() {
             <Pill tone="up">{counts.buy} buy</Pill><Pill>{counts.hold} hold</Pill><Pill tone="down">{counts.sell} sell</Pill><Pill tone="warn">{counts.avoid} no call</Pill>
           </div>
         </div>
-        {nextMonth.buy?.avg_gain_pct != null && nextMonth.all?.avg_gain_pct != null ? (
+        {nextMonth.buy && nextMonth.all ? (
           <p className="text-[13px] text-muted rounded-2xl bg-accent-soft px-4 py-3 mb-4 leading-relaxed">
-            How much to trust a buy call: from {day(nextMonth.buy.period_start)} to {day(nextMonth.buy.period_end)}, stocks rose <b className="text-ink">{nextMonth.buy.avg_gain_pct.toFixed(2)}%</b> on average in the 21 trading days after one,
-            against {nextMonth.all.avg_gain_pct.toFixed(2)}% after any call. A small edge, not a promise.
-            {nextMonth.sell?.avg_gain_pct != null ? <> After a sell call: {nextMonth.sell.avg_gain_pct.toFixed(2)}%, so a sell call means weaker than others, not a coming fall.</> : null}
-            {" "}<Link href="/track-record" className="text-accent underline underline-offset-2">Full track record</Link>
+            How much to trust a buy call: over the last three years, stocks rose <b className="text-ink">{nextMonth.buy.avg_gain_pct?.toFixed(2)}%</b> on average in the 21 trading days after one,
+            against {nextMonth.all.avg_gain_pct?.toFixed(2)}% after any call. A small edge, not a promise. Sell calls had no edge
+            ({nextMonth.sell?.avg_gain_pct?.toFixed(2)}%). <Link href="/track-record" className="text-accent underline underline-offset-2">Full track record</Link>
           </p>
         ) : null}
         {strongest.length ? (
@@ -153,7 +147,7 @@ async function Market() {
                   const r = rangeBy.get(s.company_id);
                   return (
                     <tr key={s.company_id} className="border-t border-line">
-                      <td className="px-2 py-2.5">{co ? <Link href={companyHref(co.symbol)} prefetch={false} className="font-semibold hover:text-accent">{co.symbol}</Link> : "?"}<div className="text-[12px] text-muted truncate max-w-[220px]">{co?.name}</div></td>
+                      <td className="px-2 py-2.5"><Link href={co ? companyHref(co.symbol) : "/signals"} className="font-semibold hover:text-accent">{co?.symbol}</Link><div className="text-[12px] text-muted truncate max-w-[220px]">{co?.name}</div></td>
                       <td className="px-2 py-2.5 text-right num">{price(p?.close ?? s.close)}</td>
                       <td className="px-2 py-2.5 text-right"><Change value={p ? change(p.close, p.prev_close) : null} /></td>
                       <td className="px-2 py-2.5"><ScoreBar score={s.score} /></td>
@@ -173,19 +167,19 @@ async function Market() {
         {[["Top gainers", gainers], ["Top losers", losers]].map(([label, list]) => (
           <Card key={label as string}>
             <Title sub={`${live ? "So far today" : day(prices.date)}, shares only`}>{label as string}</Title>
-            {(list as typeof movers).length ? (
+            {(list as typeof gainers).length ? (
               <ul className="divide-y divide-line">
-                {(list as typeof movers).map(({ p, ch }) => {
+                {(list as typeof gainers).map(({ row: p, change: ch }) => {
                   const co = c.byId.get(p.company_id);
                   return (
                     <li key={p.company_id} className="flex items-center justify-between py-2.5 text-[14px]">
-                      <Link href={co ? companyHref(co.symbol) : "/signals"} prefetch={false} className="min-w-0"><span className="font-semibold">{co?.symbol}</span><span className="block text-[12px] text-muted truncate">{co?.name}</span></Link>
+                      <Link href={co ? companyHref(co.symbol) : "/signals"} className="min-w-0"><span className="font-semibold">{co?.symbol}</span><span className="block text-[12px] text-muted truncate">{co?.name}</span></Link>
                       <span className="text-right"><span className="num block">{price(p.close)}</span><Change value={ch} /></span>
                     </li>
                   );
                 })}
               </ul>
-            ) : <Empty>No trades yet.</Empty>}
+            ) : <Empty>{label === "Top gainers" ? "No shares rose" : "No shares fell"}{live ? " so far today." : " on this day."}</Empty>}
           </Card>
         ))}
       </div>
