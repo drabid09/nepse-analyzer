@@ -13,14 +13,14 @@ const LABEL: Record<string, string> = { "1W": "1 week", "1M": "1 month", "3M": "
 export default async function TrackRecordPage() {
   if (!configured()) return <Setup />;
   try {
-    const [tests, scored] = await Promise.all([data.marketBacktests(), data.scoredForecasts()]);
+    const [tests, record] = await Promise.all([data.marketBacktests(), data.liveRecord()]);
     const calls = ["buy", "hold", "sell", "all"].map((v) => tests.find((t) => t.name === "call_next_21_days" && t.variant === v)).filter(Boolean) as data.Backtest[];
     const strategy = tests.find((t) => t.name === "signal" && t.kind === "strategy");
     const ranges = (h: string) => ["ensemble", "random_walk", "trend", "mean_reversion"].map((m) => tests.find((t) => t.kind === "forecast" && t.name === m && t.variant === h)).filter(Boolean) as data.Backtest[];
     const live = ["1W", "1M", "3M"].map((h) => {
-      const rows = scored.filter((s) => s.horizon === h);
-      const inside = rows.filter((r) => num(r.low)! <= num(r.actual_close)! && num(r.actual_close)! <= num(r.high)!).length;
-      return { h, n: rows.length, inside: rows.length ? (100 * inside) / rows.length : null };
+      const r = record.find((x) => x.horizon === h);
+      const n = num(r?.checked) ?? 0;
+      return { h, n, inside: n ? (100 * (num(r?.inside) ?? 0)) / n : null };
     });
     const period = calls[0] ? `${day(calls[0].period_start)} to ${day(calls[0].period_end)}` : "";
 
