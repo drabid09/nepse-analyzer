@@ -28,8 +28,22 @@ Every query runs on the server with the Supabase project's publishable key, whic
 ```
 npm ci
 SUPABASE_URL=... SUPABASE_ANON_KEY=... npm run dev
-npm test            # freshness rules, formatting, key guard
+npm test            # freshness rules, formatting, key guard, Signals filters, symbols, index repair
 npm run typecheck
+```
+
+### Click-through tests (no real database)
+
+`e2e/mock-postgrest.mjs` stands in for Supabase with made-up data; `e2e/run.mjs` drives a
+production build in Chromium (Playwright): every page without console errors, the Signals chips
+left to right and back, rapid clicks, Back/refresh keeping filters, no background prefetch,
+invalid symbols, call-consistent levels, NEPSE change, Your stocks, layout shift, late jobs,
+the feedback form failing and double-clicked, the database down, search keys, phone width.
+
+```
+node e2e/mock-postgrest.mjs &
+export SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_ANON_KEY=sb_publishable_test
+npm run build && (npx next start -p 3100 &) && node e2e/run.mjs   # needs the playwright package
 ```
 
 The website refuses to run with a secret or service_role key. Reads that change once a day are reused for 10 minutes and price history for 15, to stay well inside Supabase's free data transfer (see `docs/phase5-quality.md`).
