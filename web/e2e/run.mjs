@@ -419,15 +419,30 @@ const seen = () => fetch(`${MOCK}/__seen`).then((r) => r.json());
     .filter((r) => !(r.querySelector("a")?.textContent ?? "").includes("/"))
     .map((r) => r.children[2]?.textContent ?? ""));
   const up = changes.filter((t) => /^\+/.test(t.trim())).length, down = changes.filter((t) => /^-/.test(t.trim())).length;
+  const same = changes.filter((t) => /^0\.00%/.test(t.trim())).length;
   await page.goto(`${BASE}/`, { waitUntil: "load" });
   const market = page.locator("section", { hasText: "Shares rising" });
   const stat = async (label) => Number((await market.locator("div.min-w-0", { hasText: label }).locator("div").nth(1).innerText()).replace(/[^0-9]/g, ""));
   const rising = await stat("Shares rising"), falling = await stat("Shares falling");
+  const unchanged = Number(((await market.innerText()).match(/(\d+) unchanged/) ?? [])[1]);
   const text = await page.locator("main").innerText();
-  check("market breadth counts shares and matches the Signals table", rising === up && falling === down && /Securities traded/i.test(text) && !/Companies traded/i.test(text), `rising ${rising}/${up} falling ${falling}/${down}`);
+  // The mock's stored breadth (NEPSE's day change) counts the smallest rise as unchanged; the page
+  // must use it rather than its own count from closing prices.
+  check("market breadth: shares only, by NEPSE's day change from the jobs", rising === up - 1 && falling === down && unchanged === same + 1 && /Securities traded/i.test(text) && !/Companies traded/i.test(text),
+    `rising ${rising}/${up} falling ${falling}/${down} unchanged ${unchanged}/${same}`);
   const top = page.locator("section", { hasText: "Top gainers" }).locator("li").first();
   check("a gainer whose price failed the data check is marked", /API/.test(await top.innerText()) && /data check failed/.test(await top.innerText()), (await top.innerText()).replace(/\n/g, " "));
   check("the Sectors card names the day instead of 'today'", /Change of each NEPSE index on Mon, 23 Nov 2026/.test(text));
+}
+
+// A company whose details have not been read yet says so instead of a column of dashes.
+{
+  await page.goto(`${BASE}/c/SKBBL`, { waitUntil: "load" });
+  const card = page.locator("section", { has: page.locator("h2", { hasText: /^Company$/ }) });
+  const text = await card.innerText();
+  check("company details not read yet: a plain note, not dashes", /have not been read from NEPSE yet/.test(text) && !/Market capitalisation/i.test(text));
+  await page.goto(`${BASE}/c/NABIL`, { waitUntil: "load" });
+  check("company details present: shown as before", /Market capitalisation/i.test(await page.locator("section", { has: page.locator("h2", { hasText: /^Company$/ }) }).innerText()));
 }
 
 // Feedback: a message being written survives a refresh, and is gone once sent.
