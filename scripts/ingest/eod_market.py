@@ -38,6 +38,7 @@ from common import (  # noqa: E402
     now_npt, num, run, whole, write_summary,
 )
 from live_market import parse_npt, summary_fields  # noqa: E402
+import sharesansar  # noqa: E402
 
 EARLIEST = time(15, 12)       # leave the live job time to take its last snapshot
 NO_RUN_FROM = time(10, 15)    # from pre-open until EARLIEST, NEPSE's "latest day" is changing
@@ -219,6 +220,39 @@ def rows_from_today_price(nepse: NepseSource, trade_date: date) -> tuple[list[di
     return out, {"pages": pages, "rows": len(items), "fields": shape}
 
 
+def get_prices(nepse: NepseSource, trade_date: date) -> tuple[list[dict], dict]:
+    """The day's prices, from the first source that has them: NEPSE's live market
+    list (verified in Phase 0), NEPSE's today's-price list, then Sharesansar."""
+    attempts: list[str] = []
+
+    def traded(rows):
+        return sum(1 for r in rows if r["volume"] > 0 and r["close"] is not None)
+
+    try:
+        live = nepse.call("getLiveMarket") or []
+        newest = max((d for d in (parse_npt(r.get("lastUpdatedDateTime")) for r in live if isinstance(r, dict)) if d), default=None)
+        if newest and newest.date() == trade_date:
+            rows = rows_from_live(live, nepse.call("getPriceVolume") or [], trade_date)
+            if traded(rows) >= 50:
+                return rows, {"source": "live market", "price_source": "nepse"}
+            attempts.append(f"live market: only {traded(rows)} traded")
+        else:
+            attempts.append(f"live market dated {newest.date() if newest else 'nothing'}")
+    except JobError as exc:
+        attempts.append(f"live market: {exc}")
+    try:
+        rows, info = rows_from_today_price(nepse, trade_date)
+        if traded(rows) >= 50:
+            return rows, {**info, "source": "today's price", "price_source": "nepse", "attempts": attempts}
+        attempts.append(f"today's price: only {traded(rows)} traded")
+    except JobError as exc:
+        attempts.append(f"today's price: {exc}")
+    as_of, rows = sharesansar.fetch_today()
+    if as_of != trade_date:
+        raise JobError(f"no source has prices for {trade_date}: {'; '.join(attempts)}; Sharesansar is dated {as_of}")
+    return rows, {"source": "Sharesansar", "price_source": "sharesansar", "attempts": attempts}
+
+
 # ---------------------------------------------------------------- price adjustments
 
 
@@ -338,7 +372,11 @@ def main() -> None:
 
     db = Supabase()
     nepse = NepseSource()
-    status = nepse.call("getMarketStatus") or {}
+    try:
+        status = nepse.call("getMarketStatus") or {}
+    except JobError as exc:
+        sharesansar_only(db, exc, forced)
+        return
     if str(status.get("isOpen", "")).strip().upper() == "OPEN":
         print("NEPSE reports the market open. Nothing to do yet.")
         return
@@ -370,21 +408,56 @@ def main() -> None:
         raise
 
 
+def sharesansar_only(db: Supabase, nepse_error: JobError, forced: bool) -> None:
+    """NEPSE itself is unreachable: store the day's prices from Sharesansar so the
+    site still has a close. market_daily stays non-final, so a later run (the
+    backups at 16:40 and 19:10) completes the day from NEPSE if it comes back."""
+    as_of, rows = sharesansar.fetch_today()
+    if not as_of:
+        raise JobError(f"NEPSE unreachable ({nepse_error}) and Sharesansar's page has no date")
+    existing = db.select("market_daily", select="is_final", date=f"eq.{as_of.isoformat()}")
+    if existing and existing[0]["is_final"] and not forced:
+        print(f"NEPSE unreachable, but {as_of} is already final. Nothing to do.")
+        return
+    run_log = JobRun(db, "eod", trade_date=as_of, source="sharesansar")
+    by_security, by_symbol = company_maps(db)
+    prices = []
+    for r in rows:
+        company_id = lookup_company(r, by_security, by_symbol)
+        if company_id is None or r["volume"] <= 0 or r["close"] is None:
+            continue
+        prices.append({"company_id": company_id, "date": as_of.isoformat(), "open": r["open"], "high": r["high"],
+                       "low": r["low"], "close": r["close"], "prev_close": r["prev_close"], "volume": r["volume"],
+                       "turnover": r["turnover"], "trades": r["trades"], "is_final": True, "source": "sharesansar"})
+    if len(prices) < 50:
+        run_log.finish("failed", f"NEPSE unreachable ({nepse_error}); Sharesansar gave only {len(prices)} prices")
+        raise JobError(f"NEPSE unreachable ({nepse_error}); Sharesansar gave only {len(prices)} prices; nothing written")
+    events = detect_adjustments(db, prices, as_of)
+    written = db.upsert("daily_prices", prices, on_conflict="company_id,date")
+    if events:
+        written += db.upsert("price_adjustments", events, on_conflict="company_id,ex_date")
+        for event in events:
+            if event["status"] == "confirmed":
+                db.rpc("apply_price_adjustments", {"p_company_id": event["company_id"]})
+    up = sum(p["close"] > p["prev_close"] for p in prices if p["prev_close"])
+    down = sum(p["close"] < p["prev_close"] for p in prices if p["prev_close"])
+    same = sum(p["close"] == p["prev_close"] for p in prices if p["prev_close"])
+    written += db.upsert("market_daily", [{
+        "date": as_of.isoformat(), "turnover": round(sum(p["turnover"] or 0 for p in prices), 2),
+        "traded_shares": sum(p["volume"] for p in prices), "transactions": sum(p["trades"] or 0 for p in prices),
+        "scrips_traded": len(prices), "advancers": up, "decliners": down, "unchanged": same, "is_final": False,
+    }], on_conflict="date")
+    message = f"NEPSE unreachable ({str(nepse_error)[:120]}); {len(prices)} prices for {as_of} from Sharesansar, no floorsheet or indices"
+    run_log.finish("partial", message, rows_written=written, details={"prices": {"source": "Sharesansar"}, "adjustments": len(events)})
+    write_summary(f"## End of day {as_of} (fallback)\n\n- {message}.\n- A later run completes the day from NEPSE if it is reachable again.\n")
+
+
 def finalise(db: Supabase, nepse: NepseSource, run_log: JobRun, trade_date: date) -> None:
     problems: list[str] = []
     by_security, by_symbol = company_maps(db)
 
-    # 1. Prices: the live market list if it still holds trade_date, else today's price list
-    live = nepse.call("getLiveMarket") or []
-    newest = max((d for d in (parse_npt(r.get("lastUpdatedDateTime")) for r in live if isinstance(r, dict)) if d), default=None)
-    price_info: dict = {}
-    if newest and newest.date() == trade_date:
-        source_rows = rows_from_live(live, nepse.call("getPriceVolume") or [], trade_date)
-        price_info["source"] = "live market"
-    else:
-        source_rows, price_info = rows_from_today_price(nepse, trade_date)
-        price_info["source"] = "today's price"
-        price_info["live_market_dated"] = newest.date().isoformat() if newest else None
+    # 1. Prices
+    source_rows, price_info = get_prices(nepse, trade_date)
 
     # 2. Floorsheet (optional: prices are still written if it fails)
     floor_rows, floor_info, trades_by_company = [], {}, {}
@@ -417,7 +490,7 @@ def finalise(db: Supabase, nepse: NepseSource, run_log: JobRun, trade_date: date
             "company_id": company_id, "date": trade_date.isoformat(),
             "open": r["open"], "high": r["high"], "low": r["low"],
             "close": close, "prev_close": prev, "volume": volume, "turnover": r["turnover"],
-            "trades": floor["trades"] if floor else r["trades"], "is_final": True, "source": "nepse",
+            "trades": floor["trades"] if floor else r["trades"], "is_final": True, "source": price_info["price_source"],
         })
     if len(prices) < 50:
         raise JobError(f"only {len(prices)} traded securities for {trade_date} ({price_info}); suspiciously few, nothing written")
@@ -451,8 +524,11 @@ def finalise(db: Supabase, nepse: NepseSource, run_log: JobRun, trade_date: date
 
     # 5. Market totals
     summary = summary_fields(nepse.call("getSummary"))
+    # Only a day with NEPSE prices and a floorsheet counts as final; otherwise the
+    # backup runs try again later the same day.
+    complete = price_info["price_source"] == "nepse" and bool(floor_rows)
     market = {"date": trade_date.isoformat(), "advancers": advancers, "decliners": decliners,
-              "unchanged": unchanged, "is_final": True, **summary}
+              "unchanged": unchanged, "is_final": complete, **summary}
     written += db.upsert("market_daily", [market], on_conflict="date")
 
     # 6. Retention and storage
