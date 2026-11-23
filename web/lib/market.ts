@@ -128,6 +128,24 @@ export function breadth(changes: readonly (number | null)[]) {
   return { up, down, same, total: up + down + same };
 }
 
+export type Breadth = ReturnType<typeof breadth>;
+type Stored = { advancers: number | null; decliners: number | null; unchanged?: number | null } | null | undefined;
+
+/**
+ * The breadth to show. The jobs count ordinary shares by NEPSE's own day change (last trade against
+ * the previous close), which the closing prices on this site cannot reproduce: on 23 Nov 2026 closing
+ * prices gave 106 rising and 9 unchanged where the news reported 105 and 10. Their counts are used
+ * when they cover exactly the shares counted here (rows written before that change counted every
+ * traded security); otherwise the count from closing prices.
+ */
+export function settleBreadth(fromPrices: Breadth, stored: Stored): Breadth & { basis: "nepse" | "close" } {
+  const up = stored?.advancers, down = stored?.decliners, same = stored?.unchanged;
+  if (up != null && down != null && same != null && up + down + same === fromPrices.total && fromPrices.total > 0) {
+    return { up, down, same, total: up + down + same, basis: "nepse" };
+  }
+  return { ...fromPrices, basis: "close" };
+}
+
 /**
  * The one-line market status under the greeting. Pure, so every case is tested
  * (lib/market.test.ts). `dayLabel` formats a date for display.

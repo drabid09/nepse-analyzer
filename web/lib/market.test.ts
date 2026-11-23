@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { breadth, freshness, jobLate, nepalNow, refreshEvery, statusLine } from "./market.ts";
+import { breadth, freshness, jobLate, nepalNow, refreshEvery, settleBreadth, statusLine } from "./market.ts";
 
 // Nepal time is UTC+05:45.
 const npt = (date: string, hhmm: string) => new Date(`${date}T${hhmm}:00+05:45`);
@@ -149,4 +149,15 @@ test("open pages re-read every minute while prices or calls can still change", (
 test("breadth counts rising, falling and unchanged, skipping unknown changes", () => {
   assert.deepEqual(breadth([1.2, -0.5, 0, null, Number.NaN, 3, -2]), { up: 2, down: 2, same: 1, total: 5 });
   assert.deepEqual(breadth([]), { up: 0, down: 0, same: 0, total: 0 });
+});
+
+test("breadth: NEPSE's day change from the jobs when it covers the same shares, closing prices otherwise", () => {
+  const fromPrices = { up: 106, down: 165, same: 9, total: 280 };
+  // The jobs' count (by last trade) over the same 280 shares wins.
+  assert.deepEqual(settleBreadth(fromPrices, { advancers: 105, decliners: 165, unchanged: 10 }), { up: 105, down: 165, same: 10, total: 280, basis: "nepse" });
+  // A row from before the change counted all 360 securities: not comparable.
+  assert.equal(settleBreadth(fromPrices, { advancers: 132, decliners: 211, unchanged: 17 }).basis, "close");
+  assert.equal(settleBreadth(fromPrices, { advancers: 105, decliners: 165, unchanged: null }).basis, "close");
+  assert.equal(settleBreadth(fromPrices, null).basis, "close");
+  assert.equal(settleBreadth({ up: 0, down: 0, same: 0, total: 0 }, { advancers: 0, decliners: 0, unchanged: 0 }).basis, "close");
 });
