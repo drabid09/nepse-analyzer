@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { freshness, jobLate, nepalNow, statusLine } from "./market.ts";
+import { freshness, nepalNow, statusLine, topMovers } from "./market.ts";
 
 // Nepal time is UTC+05:45.
 const npt = (date: string, hhmm: string) => new Date(`${date}T${hhmm}:00+05:45`);
@@ -98,40 +98,11 @@ test("status line under the greeting", () => {
 });
 
 
-
-test("the update stamp comes from data jobs, never from housekeeping", () => {
-  const runs = [
-    run("eod", MON, "ok", npt(MON, "15:35")),
-    run("analytics", MON, "ok", npt(MON, "15:36")),
-    run("timer", MON, "ok", npt(MON, "16:09")),
-    run("watchdog", MON, "ok", npt(MON, "16:05")),
-    run("details", MON, "ok", npt(MON, "17:20")),
-  ];
-  assert.equal(check(runs, MON, [], npt(MON, "16:45")).lastUpdate, npt(MON, "15:36").toISOString());
-  // A failed run is not an update either.
-  const failed = [run("eod", MON, "ok", npt(MON, "15:35")), run("analytics", MON, "failed", npt(MON, "15:50"))];
-  assert.equal(check(failed, MON, [], npt(MON, "16:45")).lastUpdate, npt(MON, "15:35").toISOString());
-});
-
-test("missing calls after a final close are flagged after 16:30", () => {
-  const f = (signal: string | null, at: string, errors: string[] = []) => freshness([], MON, errors, npt(MON, at), signal).problems;
-  assert.deepEqual(f(MON, "17:00"), []);
-  assert.deepEqual(f(FRI, "16:00"), []); // calls usually arrive at about 15:50; give them time
-  assert.match(f(FRI, "17:00")[0].text, /calls are not ready yet.*Fri,? 20 Nov/);
-  assert.match(f(null, "17:00")[0].text, /not ready yet/);
-  // A failed market-wide check already says why there are no calls.
-  assert.equal(f(FRI, "17:00", ["row count"]).length, 1);
-  // Without a signal date, nothing is judged (older callers).
-  assert.deepEqual(freshness([], MON, [], npt(MON, "17:00")).problems, []);
-});
-
-test("jobs that stop reporting are marked late", () => {
-  assert.equal(jobLate("timer", npt(MON, "15:00").toISOString(), npt(MON, "16:30")), null);
-  assert.match(jobLate("timer", npt(MON, "11:00").toISOString(), npt(MON, "16:30")) ?? "", /Late/);
-  // Watchdog: hourly on weekday afternoons, daily otherwise.
-  assert.match(jobLate("watchdog", npt(MON, "11:34").toISOString(), npt(MON, "16:45")) ?? "", /every hour/);
-  assert.equal(jobLate("watchdog", npt(MON, "16:05").toISOString(), npt(MON, "16:45")), null);
-  assert.equal(jobLate("watchdog", npt(FRI, "18:05").toISOString(), npt(SAT, "12:00")), null);
-  assert.equal(jobLate("live", npt(FRI, "15:05").toISOString(), npt(MON, "16:45")), null);
-  assert.equal(jobLate("timer", null, npt(MON, "16:45")), null);
+test("movers: gainers only rose, losers only fell, biggest first", () => {
+  const rows = [5, 3, 0, -1, 2, null, -4, 1].map((change, i) => ({ row: `S${i}`, change }));
+  const { gainers, losers } = topMovers(rows, 6);
+  assert.deepEqual(gainers.map((g) => g.change), [5, 3, 2, 1]);
+  assert.deepEqual(losers.map((l) => l.change), [-4, -1]);
+  // A day when everything rose: no "losers" at all.
+  assert.deepEqual(topMovers([1, 2, 3].map((c) => ({ row: c, change: c }))).losers, []);
 });

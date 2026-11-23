@@ -14,27 +14,13 @@ export function nepalNow(now = new Date()) {
   return { date: `${parts.year}-${parts.month}-${parts.day}`, minutes, weekday };
 }
 
-function shortDay(date: string): string {
-  return new Date(`${date.slice(0, 10)}T00:00:00+05:45`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: TZ });
-}
-
 export type Freshness = {
   session: "open" | "pre-open" | "closed";
   problems: { level: "warning" | "error"; text: string }[];
   lastUpdate: string | null;
 };
 
-/** Jobs that change what the dashboard shows. The header's "updated … ago" comes from these only,
- * never from housekeeping jobs (timer, watchdog, company details), which would make old prices look new. */
-export const DATA_JOBS = ["live", "eod", "analytics"] as const;
-
-/**
- * `signalDate`: the newest day with calls. When given, a trading day whose close is final
- * by 16:30 but whose calls are missing is flagged (the calls arrive at about 15:50).
- */
-export function freshness(
-  runs: JobRun[], latestFinal: string | null, marketErrors: string[], now = new Date(), signalDate?: string | null,
-): Freshness {
+export function freshness(runs: JobRun[], latestFinal: string | null, marketErrors: string[], now = new Date()): Freshness {
   const { date, minutes, weekday } = nepalNow(now);
   const byJob = Object.fromEntries(runs.map((r) => [r.job, r]));
   const live = byJob.live;
@@ -59,45 +45,10 @@ export function freshness(
   if (weekday && !holiday && minutes >= 16 * 60 + 30 && latestFinal && latestFinal < date) {
     problems.push({ level: "warning", text: "Today's closing prices are not final yet. Calls and ranges are from the previous close." });
   }
-  if (signalDate !== undefined && weekday && !holiday && minutes >= 16 * 60 + 30 && latestFinal === date
-      && !marketErrors.length && (signalDate === null || signalDate < date)) {
-    problems.push({ level: "warning", text: signalDate
-      ? `Today's calls are not ready yet. The calls shown are from the close of ${shortDay(signalDate)}.`
-      : "Today's calls are not ready yet." });
-  }
   for (const e of marketErrors) problems.push({ level: "error", text: `Data check failed: ${e}. No new calls are shown until it is resolved.` });
 
-  const stamps = runs
-    .filter((r) => (DATA_JOBS as readonly string[]).includes(r.job) && ["ok", "partial", "running"].includes(r.status))
-    .map((r) => r.heartbeat_at).filter(Boolean).sort();
+  const stamps = runs.map((r) => r.heartbeat_at).filter(Boolean).sort();
   return { session, problems, lastUpdate: stamps.at(-1) ?? null };
-}
-
-/**
- * Whether a job's latest report is older than its schedule allows, in words, or null.
- * Only jobs with a fixed rhythm are judged; live prices and the end of day are already
- * covered by freshness().
- */
-export function jobLate(job: string, heartbeatAt: string | null | undefined, now = new Date()): string | null {
-  if (!heartbeatAt) return null;
-  const ageH = (now.getTime() - new Date(heartbeatAt).getTime()) / 3_600_000;
-  const { minutes, weekday } = nepalNow(now);
-  const limit = (hours: number, rhythm: string) => (ageH > hours ? `Late: expected ${rhythm}, last report ${Math.floor(ageH)} h ago.` : null);
-  switch (job) {
-    case "timer":
-      return limit(3, "every hour");
-    case "watchdog":
-      // Hourly 11:05 to 18:05 on weekdays, and daily at 08:25.
-      return weekday && minutes >= 12 * 60 + 30 && minutes <= 19 * 60 ? limit(2, "every hour this afternoon") : limit(26, "daily");
-    case "backtest":
-      return limit(8 * 24, "every Saturday");
-    case "details":
-      return limit(3 * 24, "daily, Sunday to Friday");
-    case "companies":
-      return limit(8 * 24, "every Sunday");
-    default:
-      return null;
-  }
 }
 
 /**
@@ -120,3 +71,16 @@ export function statusLine(
   return `The market is closed. These are the prices from ${dayLabel(o.priceDate)}.`;
 }
 
+
+/**
+ * Top gainers and losers: only real rises and only real falls. On a day when nearly
+ * everything rose, "Top losers" stays short rather than listing rising shares.
+ */
+export function topMovers<T>(rows: { row: T; change: number | null }[], n = 6) {
+  const moved = rows.filter((r): r is { row: T; change: number } => r.change !== null && Number.isFinite(r.change));
+  const byChange = [...moved].sort((a, b) => b.change - a.change);
+  return {
+    gainers: byChange.filter((m) => m.change > 0).slice(0, n),
+    losers: byChange.filter((m) => m.change < 0).reverse().slice(0, n),
+  };
+}

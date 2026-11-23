@@ -24,3 +24,8 @@ test("the list is capped", () => {
   assert.equal(toggleSymbol(full, "EXTRA").length, WATCHLIST_MAX);
   assert.equal(parseWatchlist(JSON.stringify([...full, "EXTRA"])).length, WATCHLIST_MAX);
 });
+
+test("debenture symbols with a slash can be starred", () => {
+  assert.deepEqual(toggleSymbol([], "gbd80/81"), ["GBD80/81"]);
+  assert.deepEqual(parseWatchlist('["GBD80/81", "NABIL"]'), ["GBD80/81", "NABIL"]);
+});

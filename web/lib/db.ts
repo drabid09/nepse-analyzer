@@ -5,10 +5,18 @@
 // browser because every query runs on the server. Set SUPABASE_URL and
 // SUPABASE_ANON_KEY in the Vercel project's environment variables.
 
-/** An error whose message is safe to show visitors. Details stay in the server log. */
-export class DataError extends Error {}
-
-if (typeof window !== "undefined") throw new Error("lib/db.ts runs on the server only: it holds the database key.");
+/**
+ * A failed read or write. `message` is safe to show visitors; `detail` (the
+ * database's own error text) is only written to the server log.
+ */
+export class DataError extends Error {
+  detail?: string;
+  constructor(message: string, detail?: string) {
+    super(message);
+    this.detail = detail;
+    if (detail) console.error(`${message} ${detail}`);
+  }
+}
 
 export function configured(): boolean {
   return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY);
@@ -66,12 +74,17 @@ export async function insert(table: string, row: Record<string, unknown>): Promi
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     if (text.includes("Too many messages")) throw new DataError("Too many messages right now. Please try again later.");
-    console.error(`insert ${table} failed: HTTP ${response.status} ${text.slice(0, 300)}`);
-    throw new DataError(`The database refused the message (HTTP ${response.status}).`);
+    throw new DataError(`The database refused the message (HTTP ${response.status}).`, text.slice(0, 300));
   }
 }
 
+/**
+ * Reads rows through PostgREST. With `all`, rows are fetched 1000 at a time; that
+ * needs an `order` ending in a unique key, or rows can repeat or go missing
+ * between pages, so it is required.
+ */
 export async function rest<T>(table: string, params: Params = {}, options: { revalidate?: number; all?: boolean } = {}): Promise<T[]> {
+  if (options.all && !params.order) throw new DataError(`Read of ${table}: paging needs a stable order.`);
   const { base, headers } = connection();
   const query = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) if (v !== undefined) query.set(k, String(v));
@@ -92,17 +105,9 @@ export async function rest<T>(table: string, params: Params = {}, options: { rev
     }
     if (!response.ok) {
       const text = await response.text().catch(() => "");
-      // The database's own message can name columns and settings: log it, show only the status.
-      console.error(`read ${table} failed: HTTP ${response.status} ${text.slice(0, 300)}`);
-      throw new DataError(`The database refused a read of ${table} (HTTP ${response.status}).`);
+      throw new DataError(`Database refused a read of ${table} (HTTP ${response.status}).`, text.slice(0, 300));
     }
-    let chunk: T[];
-    try {
-      chunk = (await response.json()) as T[];
-    } catch {
-      throw new DataError(`The database sent an unreadable answer for ${table}.`);
-    }
-    if (!Array.isArray(chunk)) throw new DataError(`The database sent an unexpected answer for ${table}.`);
+    const chunk = (await response.json()) as T[];
     rows.push(...chunk);
     if (!options.all || chunk.length < page) return rows;
   }

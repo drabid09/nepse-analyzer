@@ -1,9 +1,7 @@
 // Every read the dashboard makes. Tables and columns are documented in
 // docs/phase1-database.md, docs/phase2-ingestion.md and docs/phase3-analytics.md.
 
-import "server-only";
 import { rest } from "./db";
-import { settlePrevClose } from "./indices";
 
 export type Company = {
   id: number; symbol: string; name: string; sector_id: number | null; instrument_type: string | null;
@@ -73,7 +71,7 @@ export type SignalLite = Pick<Signal, "company_id" | "date" | "recommendation" |
 
 export async function companies() {
   const [list, sectors] = await Promise.all([
-    rest<Company>("companies", { select: "id,symbol,name,sector_id,instrument_type,is_tradable,isin,listing_date,face_value,listed_shares,paid_up_capital,market_cap,promoter_pct,public_pct", order: "symbol,id" }, { revalidate: HOUR, all: true }),
+    rest<Company>("companies", { select: "id,symbol,name,sector_id,instrument_type,is_tradable,isin,listing_date,face_value,listed_shares,paid_up_capital,market_cap,promoter_pct,public_pct", order: "symbol" }, { revalidate: HOUR, all: true }),
     rest<Sector>("sectors", { select: "id,name", order: "name" }, { revalidate: HOUR }),
   ]);
   const sectorName = new Map(sectors.map((s) => [s.id, s.name]));
@@ -81,16 +79,15 @@ export async function companies() {
 }
 
 export async function health() {
-  const [runs, finalDay, signalDate] = await Promise.all([
+  const [runs, finalDay] = await Promise.all([
     rest<JobRun>("latest_job_runs", { select: "*" }),
     rest<{ date: string }>("market_daily", { select: "date", is_final: "eq.true", order: "date.desc", limit: 1 }),
-    latestSignalDate(),
   ]);
   const latestFinal = finalDay[0]?.date ?? null;
   const errors = latestFinal
-    ? await rest<Issue>("quality_issues", { select: "detail", trade_date: `eq.${latestFinal}`, severity: "eq.error", company_id: "is.null", order: "id" })
+    ? await rest<Issue>("quality_issues", { select: "detail", trade_date: `eq.${latestFinal}`, severity: "eq.error", company_id: "is.null" })
     : [];
-  return { runs, latestFinal, signalDate, marketErrors: errors.map((e) => e.detail) };
+  return { runs, latestFinal, marketErrors: errors.map((e) => e.detail) };
 }
 
 export async function latestSignalDate(): Promise<string | null> {
@@ -98,8 +95,6 @@ export async function latestSignalDate(): Promise<string | null> {
   return rows[0]?.date ?? null;
 }
 
-// Paged reads always carry an order on a unique key: without one, Postgres may return the
-// pages in different orders and a row can be counted twice or missed.
 export const signalsOn = (date: string) =>
   rest<SignalLite>("signals", { select: "company_id,date,recommendation,score,confidence,trend_short,rsi_14,close,data_ok,data_note", date: `eq.${date}`, order: "company_id" }, { all: true, revalidate: DAILY });
 export const forecastsOn = (date: string, horizon = "1M") =>
@@ -120,33 +115,23 @@ export async function latestPrices() {
 export const marketDays = (n = 2) => rest<MarketDay>("market_daily", { select: "*", order: "date.desc", limit: n });
 export const indices = () => rest<IndexInfo>("indices", { select: "id,code,name,kind", order: "id" }, { revalidate: HOUR });
 
-/**
- * The latest day of every index, with the previous close taken from our own final close of
- * the previous trading day (NEPSE's own field rolls over to the close after the market
- * shuts: lib/indices.ts). The previous trading day is the last market day stored before.
- */
 export async function indexDays() {
   const last = await rest<{ date: string }>("index_daily", { select: "date", order: "date.desc", limit: 1 });
   const date = last[0]?.date;
   if (!date) return { date: null as string | null, rows: [] as IndexDay[] };
-  const [rows, before] = await Promise.all([
-    rest<IndexDay>("index_daily", { select: "*", date: `eq.${date}`, order: "index_id" }),
-    rest<{ date: string }>("market_daily", { select: "date", date: `lt.${date}`, order: "date.desc", limit: 1 }, { revalidate: DAILY }),
-  ]);
-  const previous = before[0]?.date
-    ? await rest<{ index_id: number; close: number }>("index_daily", { select: "index_id,close", date: `eq.${before[0].date}`, is_final: "eq.true", order: "index_id" }, { revalidate: DAILY })
-    : [];
-  return { date, rows: settlePrevClose(rows, new Map(previous.map((p) => [p.index_id, Number(p.close)]))) };
+  return { date, rows: await rest<IndexDay>("index_daily", { select: "*", date: `eq.${date}` }) };
 }
-
 
 export const indexIntraday = (indexId: number, sinceIso: string) =>
   rest<{ ts: string; value: number }>("index_intraday", { select: "ts,value", index_id: `eq.${indexId}`, ts: `gte.${sinceIso}`, order: "ts" }, { all: true });
 
-/** `symbol` must already be checked with parseSymbol (lib/symbol.ts). */
+/**
+ * A company by its symbol, from the cached company list: an address with an
+ * unknown or made-up symbol costs no database read.
+ */
 export async function companyBySymbol(symbol: string) {
-  const rows = await rest<Company>("companies", { select: "*", symbol: `eq.${symbol}`, order: "id", limit: 1 }, { revalidate: HOUR });
-  return rows[0] ?? null;
+  const { list } = await companies();
+  return list.find((c) => c.symbol === symbol) ?? null;
 }
 
 const PRICE_COLUMNS = "date,open,high,low,close,prev_close,volume,turnover,trades,adj_factor,is_final";
@@ -157,7 +142,7 @@ export async function companyPrices(companyId: number, since: string) {
   if (!latest) return [] as Price[];
   const [history, today] = await Promise.all([
     rest<Price>("daily_prices", { select: PRICE_COLUMNS, company_id: `eq.${companyId}`, and: `(date.gte.${since},date.lt.${latest})`, order: "date" }, { all: true, revalidate: HISTORY }),
-    rest<Price>("daily_prices", { select: PRICE_COLUMNS, company_id: `eq.${companyId}`, date: `eq.${latest}`, limit: 1 }, { revalidate: LIVE }),
+    rest<Price>("daily_prices", { select: PRICE_COLUMNS, company_id: `eq.${companyId}`, date: `eq.${latest}` }, { revalidate: LIVE }),
   ]);
   return [...history, ...today];
 }
@@ -183,5 +168,10 @@ export const issues = (filters: Record<string, string> = {}, limit = 50) =>
   rest<Issue>("quality_issues", { select: "*", order: "trade_date.desc,severity", limit, ...filters });
 export const recentRuns = (limit = 40) =>
   rest<JobRun>("job_runs", { select: "id,job,trade_date,status,started_at,heartbeat_at,finished_at,run_url,requests,rows_written,message", order: "started_at.desc", limit });
-export const scoredForecasts = () =>
-  rest<Pick<Forecast, "horizon" | "low" | "high" | "mid" | "actual_close" | "made_on">>("forecasts", { select: "horizon,low,mid,high,actual_close,made_on", model: "eq.ensemble", actual_close: "not.is.null", order: "company_id,made_on,horizon" }, { revalidate: HOUR, all: true });
+/**
+ * How the published ranges are doing: one row per horizon, counted in the database
+ * (view forecast_live_record), so the read stays a few bytes however many ranges
+ * have been checked.
+ */
+export const liveRecord = () =>
+  rest<{ horizon: string; checked: number; inside: number }>("forecast_live_record", { select: "horizon,checked,inside" }, { revalidate: HOUR });
