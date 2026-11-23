@@ -6,7 +6,7 @@ import { configured } from "@/lib/db";
 import { Setup, Unavailable } from "@/components/states";
 import { YourStocks, type WatchRow } from "@/components/watchlist";
 import { change, day, num, price, rupees, whole } from "@/lib/format";
-import { nepalNow } from "@/lib/market";
+import { statusLine } from "@/lib/market";
 import { VIEWER } from "@/lib/viewer";
 
 export const revalidate = 60;
@@ -56,15 +56,7 @@ async function Market() {
     }];
   });
 
-  const now = nepalNow();
-  const tradingHours = now.weekday && now.minutes >= 11 * 60 && now.minutes < 15 * 60;
-  const status = live
-    ? "The market is open. Prices update about every 5 minutes."
-    : tradingHours
-      ? `Live prices have not arrived yet today. These are the prices from ${day(prices.date)}.`
-      : prices.date === now.date
-        ? "The market has closed. These are today's final prices; new calls arrive at about 15:50."
-        : `The market is closed. These are the prices from ${day(prices.date)}.`;
+  const status = statusLine({ live, priceDate: prices.date, signalDate, now: new Date() }, day);
 
   return (
     <div className="space-y-6">
