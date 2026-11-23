@@ -51,7 +51,7 @@ export function SignalsTable({ rows }: { rows: Row[] }) {
           {CALLS.map((k) => (
             <button key={k} onClick={() => setCall(k)}
               className={`rounded-full px-3 py-1.5 text-[13px] capitalize ${call === k ? "bg-ink text-bg" : "bg-soft text-muted hover:text-ink"}`}>
-              {k === "avoid" ? "No call" : k} <span className="opacity-60">{k === "all" ? rows.length : rows.filter((r) => r.call === k).length}</span>
+              {k === "avoid" ? "No call" : k} <span className="num">{k === "all" ? rows.length : rows.filter((r) => r.call === k).length}</span>
             </button>
           ))}
         </div>
