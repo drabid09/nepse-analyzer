@@ -50,3 +50,24 @@ export function freshness(runs: JobRun[], latestFinal: string | null, marketErro
   const stamps = runs.map((r) => r.heartbeat_at).filter(Boolean).sort();
   return { session, problems, lastUpdate: stamps.at(-1) ?? null };
 }
+
+/**
+ * The one-line market status under the greeting. Pure, so every case is tested
+ * (lib/market.test.ts). `dayLabel` formats a date for display.
+ */
+export function statusLine(
+  o: { live: boolean; priceDate: string | null; signalDate: string | null; now: Date },
+  dayLabel: (date: string | null) => string,
+): string {
+  const { date, minutes, weekday } = nepalNow(o.now);
+  const tradingHours = weekday && minutes >= 11 * 60 && minutes < 15 * 60;
+  const today = o.priceDate === date;
+  if (o.live && tradingHours && today) return "The market is open. Prices update about every 5 minutes.";
+  if (o.live && today) return "Trading has ended for today. Final prices arrive at about 15:20 and new calls at about 15:50.";
+  if (o.live) return `These are the latest prices, from ${dayLabel(o.priceDate)}; the final close for that day is not confirmed yet.`;
+  if (tradingHours) return `Live prices have not arrived yet today. These are the prices from ${dayLabel(o.priceDate)}.`;
+  if (today && o.signalDate === date) return "The market has closed. These are today's final prices and today's new calls.";
+  if (today) return "The market has closed. These are today's final prices; new calls arrive at about 15:50.";
+  return `The market is closed. These are the prices from ${dayLabel(o.priceDate)}.`;
+}
+
