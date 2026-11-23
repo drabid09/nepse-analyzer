@@ -99,3 +99,22 @@ def test_missing_security_headers_are_caught():
 def test_a_page_that_is_down_is_caught():
     problems, _, _ = sm.check(db(), site({"/signals": None}))
     assert any(p.startswith("/signals: HTTP 404") for p in problems)
+
+
+def test_waits_for_the_new_deployment(monkeypatch):
+    served = iter(["old", "old", "new"])
+    monkeypatch.setattr(sm.clock, "sleep", lambda s: None)
+    monkeypatch.setattr(sm, "served_commit", lambda client: next(served))
+    assert sm.wait_for_commit(None, "new", timeout=60, poll=1) == (True, "new")
+
+
+def test_reads_the_commit_from_the_page():
+    page = '<head><meta name="x-commit" content="abc123"/></head>'
+    client = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, text=page)), base_url="http://test")
+    assert sm.served_commit(client) == "abc123"
+
+
+def test_gives_up_when_the_deployment_never_arrives(monkeypatch):
+    monkeypatch.setattr(sm, "served_commit", lambda client: "old")
+    assert sm.wait_for_commit(None, "new", timeout=0, poll=1) == (False, "old")
+
