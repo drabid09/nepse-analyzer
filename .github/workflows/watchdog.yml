@@ -9,6 +9,11 @@ on:
     - cron: "20 5-12 * * 1-5"   # hourly, 11:05 to 18:05 Nepal time on weekdays
     - cron: "40 2 * * *"        # 08:25 Nepal time every day, weekends included
   workflow_dispatch:
+    inputs:
+      timer:
+        description: "Started by the Supabase timer: behave like a scheduled run"
+        type: boolean
+        default: false
   push:
     branches: ["phase-3/**"]
     paths:

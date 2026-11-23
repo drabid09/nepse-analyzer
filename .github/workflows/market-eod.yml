@@ -11,6 +11,11 @@ on:
     - cron: "55 10 * * 1-5"   # 16:40 backup
     - cron: "25 13 * * 1-5"   # 19:10 backup
   workflow_dispatch:
+    inputs:
+      timer:
+        description: "Started by the Supabase timer: behave like a scheduled run"
+        type: boolean
+        default: false
   push:
     branches: ["phase-2/**"]
     paths:
@@ -46,4 +51,6 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          # A timer-started run skips work already done; one started by hand redoes it.
+          RUN_BY_TIMER: ${{ inputs.timer && '1' || '' }}
         run: python scripts/ingest/eod_market.py

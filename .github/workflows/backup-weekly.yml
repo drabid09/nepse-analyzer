@@ -8,6 +8,11 @@ on:
   schedule:
     - cron: "25 14 * * 6"   # Saturdays 20:10 Nepal time
   workflow_dispatch:
+    inputs:
+      timer:
+        description: "Started by the Supabase timer: behave like a scheduled run"
+        type: boolean
+        default: false
 
 permissions:
   contents: read

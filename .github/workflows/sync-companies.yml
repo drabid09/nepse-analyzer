@@ -7,6 +7,11 @@ on:
   schedule:
     - cron: "17 3 * * 0"   # Sundays 09:02 Nepal time: new listings, renamed or delisted securities
   workflow_dispatch:
+    inputs:
+      timer:
+        description: "Started by the Supabase timer: behave like a scheduled run"
+        type: boolean
+        default: false
   push:
     branches: ["phase-1/**", "phase-2/**"]
     paths:
