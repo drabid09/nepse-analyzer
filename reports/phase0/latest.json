@@ -1,15 +1,15 @@
 {
-  "run_at_utc": "2026-11-26 15:40:10",
-  "run_at_npt": "2026-11-26 21:25 NPT (Thursday)",
+  "run_at_utc": "2026-11-26 18:21:47",
+  "run_at_npt": "2026-11-27 00:06 NPT (Friday)",
   "trigger": "schedule",
   "runner": {
-    "github_runner": "GitHub Actions 1000000419",
+    "github_runner": "GitHub Actions 1000000428",
     "runner_os": "Linux",
-    "ip": "52.173.179.87",
-    "city": "Des Moines",
-    "region": "Iowa",
+    "ip": "3.42.157.109",
+    "city": "Boardman",
+    "region": "Oregon",
     "country": "US",
-    "org": "AS8075 Microsoft Corporation"
+    "org": "AS16509 Amazon.com, Inc."
   },
   "sources": {
     "nepalstock": {
@@ -39,7 +39,7 @@
         "user_agent": "honest",
         "reachable": true,
         "status": 200,
-        "seconds": 1.3,
+        "seconds": 1.07,
         "final_url": "https://www.nepalstock.com/",
         "bytes": 2830,
         "content_type": "text/html",
@@ -53,7 +53,7 @@
         "user_agent": "honest",
         "reachable": true,
         "status": 200,
-        "seconds": 1.66,
+        "seconds": 1.03,
         "final_url": "https://www.nepalstock.com/robots.txt",
         "bytes": 2830,
         "content_type": "text/html",
@@ -69,7 +69,7 @@
         "user_agent": "browser",
         "reachable": true,
         "status": 401,
-        "seconds": 1.61,
+        "seconds": 1.03,
         "final_url": "https://www.nepalstock.com/api/nots/nepse-data/market-open",
         "bytes": 87,
         "content_type": "text/html;charset=UTF-8",
@@ -84,7 +84,7 @@
         "calls": {
           "market_status": {
             "ok": true,
-            "seconds": 1.85,
+            "seconds": 1.33,
             "requests": 2,
             "type": "dict",
             "fields": [
@@ -96,7 +96,7 @@
           },
           "nepse_index": {
             "ok": true,
-            "seconds": 0.26,
+            "seconds": 0.27,
             "requests": 1,
             "type": "list",
             "count": 4,
@@ -120,7 +120,7 @@
           },
           "sub_indices": {
             "ok": true,
-            "seconds": 0.26,
+            "seconds": 0.27,
             "requests": 1,
             "type": "list",
             "count": 13,
@@ -135,7 +135,7 @@
           },
           "market_summary": {
             "ok": true,
-            "seconds": 0.26,
+            "seconds": 0.27,
             "requests": 1,
             "type": "list",
             "count": 6,
@@ -147,7 +147,7 @@
           },
           "company_list": {
             "ok": true,
-            "seconds": 0.53,
+            "seconds": 0.55,
             "requests": 1,
             "type": "list",
             "count": 652,
@@ -182,7 +182,7 @@
           },
           "security_list": {
             "ok": true,
-            "seconds": 0.52,
+            "seconds": 0.28,
             "requests": 1,
             "type": "list",
             "count": 573,
@@ -197,7 +197,7 @@
           },
           "price_volume_today": {
             "ok": true,
-            "seconds": 0.28,
+            "seconds": 0.29,
             "requests": 1,
             "type": "list",
             "count": 279,
@@ -220,7 +220,7 @@
           },
           "live_market": {
             "ok": true,
-            "seconds": 0.26,
+            "seconds": 0.27,
             "requests": 1,
             "type": "list",
             "count": 0,
@@ -231,7 +231,7 @@
           },
           "top_gainers": {
             "ok": true,
-            "seconds": 0.26,
+            "seconds": 0.27,
             "requests": 1,
             "type": "list",
             "count": 123,
@@ -247,18 +247,14 @@
             "sample": "{\"symbol\": \"UNLB\", \"ltp\": 1246.9, \"cp\": 1246.9, \"pointChange\": 58.0, \"percentageChange\": 4.88, \"securityName\": \"Unique Nepal Laghubitta Bittiya Sanstha Limited\", \"securityId\": 9140}"
           },
           "index_intraday_graph": {
-            "ok": true,
-            "seconds": 0.52,
-            "requests": 2,
-            "type": "list",
-            "count": 610,
-            "sample": "[1795669500, 2650.77]",
-            "first_point": "[1795669500, 2650.77]",
-            "last_point": "[1795684440, 2637.52]"
+            "ok": false,
+            "seconds": 3.23,
+            "requests": 13,
+            "error": "Exhausted: more than 12 requests needed for one call"
           },
           "history_NABIL": {
             "ok": true,
-            "seconds": 0.78,
+            "seconds": 0.55,
             "requests": 2,
             "type": "dict",
             "fields": [
@@ -291,7 +287,7 @@
           },
           "history_ACLBSL": {
             "ok": true,
-            "seconds": 0.26,
+            "seconds": 0.28,
             "requests": 1,
             "type": "dict",
             "fields": [
@@ -327,61 +323,32 @@
             "seconds": 0.27,
             "requests": 1,
             "type": "list",
-            "count": 99,
-            "fields": [
-              "contractQuantity",
-              "contractRate",
-              "time"
-            ],
-            "sample": "{\"contractQuantity\": null, \"contractRate\": 560.0, \"time\": 1795669260}"
+            "count": 0
           },
           "company_details_NABIL": {
             "ok": true,
-            "seconds": 0.29,
+            "seconds": 0.27,
             "requests": 1,
-            "type": "dict",
-            "fields": [
-              "issuedCapital",
-              "marketCapitalization",
-              "paidUpCapital",
-              "promoterPercentage",
-              "promoterShares",
-              "publicPercentage",
-              "publicShares",
-              "security",
-              "securityDailyTradeDto",
-              "securityId",
-              "stockListedShares",
-              "updatedDate"
-            ],
-            "sample": "{\"securityDailyTradeDto\": {\"securityId\": \"131\", \"openPrice\": 560.0, \"highPrice\": 565.0, \"lowPrice\": 555.0, \"totalTradeQuantity\": 72688, \"totalTrades\": 407, \"lastTradedPrice\": 559.0, \"previousClose\": 556.3, \"businessDate\": \"2026-11-26\", \"closePrice\": 559.0, \"fiftyTwoWeekHigh\": 581.0, \"fiftyTwoWeekLow\": 485.0, \"lastUpdatedDateTime\": \"2026-11-26T14:59:52.125835\"}, \"security\": {\"id\": 131, \"symbol\": \"NABIL\", \"isin\": \"NPE025A00004\", \"permittedToTrade\": \"Y\", \"listingDate\": \"1985-11-24\", \"creditRating\": null, \"tickSize\": 0.1, \"instrumentType\": {\"id\": 1, \"code\": \"EQ\", \"description\": \"Equity\", \"activeStatus\": \"A\"}, \"capitalGainBaseDate\": \"2006-12-29\", \"faceValue\": 100.0, \"highRangeDPR\": null, \"issuerN ...[truncated]"
+            "type": "list",
+            "count": 0
           },
           "floorsheet_first_page": {
             "ok": true,
-            "seconds": 0.29,
+            "seconds": 0.27,
             "requests": 1,
-            "type": "dict",
-            "fields": [
-              "floorsheets",
-              "totalAmount",
-              "totalQty",
-              "totalTrades"
-            ],
-            "sample": "{\"totalAmount\": 5489584101.96, \"totalQty\": 14710298, \"floorsheets\": {\"content\": [{\"contractId\": 2026112601011289, \"stockSymbol\": \"NMB\", \"buyerMemberId\": \"34\", \"sellerMemberId\": \"33\", \"contractQuantity\": 1, \"contractRate\": 290.0, \"contractAmount\": 290.0, \"businessDate\": \"2026-11-26\", \"tradeBookId\": 202885865, \"stockId\": 238, \"buyerBrokerName\": \"Vision Securities Pvt. Ltd\", \"sellerBrokerName\": \"Dakshinkali Investment & Securities Pvt. Ltd.\", \"tradeTime\": \"2026-11-26T14:59:59.998886\", \"securityName\": \"NMB Bank Limited\"}, {\"contractId\": 2026112604013261, \"stockSymbol\": \"BHCL\", \"buyerMemberId\": \"32\", \"sellerMemberId\": \"49\", \"contractQuantity\": 10, \"contractRate\": 556.0, \"contractAmount\": 5560.0,  ...[truncated]",
-            "paging": {
-              "totalElements": 49806,
-              "totalPages": 2491
-            }
+            "type": "list",
+            "count": 0
           }
         },
         "burst_10_calls": {
           "succeeded": 10,
-          "slowest_seconds": 0.26,
+          "slowest_seconds": 0.27,
           "errors": []
         },
-        "request_total": 28,
+        "request_total": 39,
         "http_statuses": {
-          "200": 28
+          "200": 32,
+          "401": 6
         }
       }
     },
@@ -393,7 +360,7 @@
           "user_agent": "honest",
           "reachable": true,
           "status": 200,
-          "seconds": 0.19,
+          "seconds": 0.15,
           "final_url": "https://raw.githubusercontent.com/Aabishkar2/nepse-data/main/data/company-wise/NABIL.csv",
           "bytes": 223001,
           "content_type": "text/plain; charset=utf-8",
@@ -441,7 +408,7 @@
           "user_agent": "honest",
           "reachable": true,
           "status": 200,
-          "seconds": 0.41,
+          "seconds": 0.19,
           "final_url": "https://raw.githubusercontent.com/Aabishkar2/nepse-data/main/data/company-wise/ACLBSL.csv",
           "bytes": 86047,
           "content_type": "text/plain; charset=utf-8",
@@ -490,7 +457,7 @@
         "user_agent": "honest",
         "reachable": true,
         "status": 200,
-        "seconds": 0.4,
+        "seconds": 0.3,
         "final_url": "https://api.github.com/repos/Aabishkar2/nepse-data/commits?per_page=1",
         "bytes": 3323,
         "content_type": "application/json; charset=utf-8",
@@ -499,7 +466,7 @@
         "rate_headers": {
           "x-ratelimit-limit": "5000",
           "x-ratelimit-remaining": "4999",
-          "x-ratelimit-reset": "1795711263"
+          "x-ratelimit-reset": "1795720959"
         },
         "block_signals": [],
         "date": "2026-11-25T22:00:41Z"
@@ -524,7 +491,7 @@
         "user_agent": "honest",
         "reachable": true,
         "status": 200,
-        "seconds": 0.13,
+        "seconds": 0.24,
         "final_url": "https://www.sharesansar.com/robots.txt",
         "bytes": 24,
         "content_type": "text/plain; charset=utf-8",
@@ -539,7 +506,7 @@
         "user_agent": "honest",
         "reachable": true,
         "status": 200,
-        "seconds": 3.56,
+        "seconds": 2.19,
         "final_url": "https://www.sharesansar.com/today-share-price",
         "bytes": 755948,
         "content_type": "text/html; charset=utf-8",
@@ -601,7 +568,7 @@
         "user_agent": "honest",
         "reachable": true,
         "status": 200,
-        "seconds": 1.19,
+        "seconds": 1.18,
         "final_url": "https://merolagani.com/robots.txt",
         "bytes": 616,
         "content_type": "text/html; charset=utf-8",
@@ -616,7 +583,7 @@
         "user_agent": "honest",
         "reachable": true,
         "status": 200,
-        "seconds": 3.72,
+        "seconds": 2.92,
         "final_url": "https://merolagani.com/LatestMarket.aspx",
         "bytes": 285823,
         "content_type": "text/html; charset=utf-8",
@@ -651,7 +618,7 @@
         "user_agent": "honest",
         "reachable": true,
         "status": 200,
-        "seconds": 0.37,
+        "seconds": 0.05,
         "final_url": "https://nepsealpha.com/robots.txt",
         "bytes": 167,
         "content_type": "text/plain; charset=utf-8",
@@ -666,7 +633,7 @@
         "user_agent": "honest",
         "reachable": true,
         "status": 200,
-        "seconds": 1.42,
+        "seconds": 1.17,
         "final_url": "https://nepsealpha.com/",
         "bytes": 308587,
         "content_type": "text/html; charset=utf-8",
@@ -684,7 +651,7 @@
           "user_agent": "honest",
           "reachable": true,
           "status": 404,
-          "seconds": 0.14,
+          "seconds": 0.18,
           "final_url": "https://shubhamnpk.github.io/yonepse/data/market_status.json",
           "bytes": 9379,
           "content_type": "text/html; charset=utf-8",
@@ -698,7 +665,7 @@
           "user_agent": "honest",
           "reachable": true,
           "status": 200,
-          "seconds": 0.13,
+          "seconds": 0.17,
           "final_url": "https://shubhamnpk.github.io/yonepse/data/nepse_data.json",
           "bytes": 142837,
           "content_type": "application/json; charset=utf-8",
@@ -730,7 +697,7 @@
           "user_agent": "honest",
           "reachable": true,
           "status": 404,
-          "seconds": 0.1,
+          "seconds": 0.13,
           "final_url": "https://shubhamnpk.github.io/yonepse/data/upcoming_ipo.json",
           "bytes": 9379,
           "content_type": "text/html; charset=utf-8",
@@ -742,5 +709,5 @@
       }
     }
   },
-  "duration_seconds": 80.4
+  "duration_seconds": 77.1
 }
