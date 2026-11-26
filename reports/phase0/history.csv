@@ -7,3 +7,4 @@ run_at_utc,run_at_npt,trigger,runner_country,nepse_tls_verified,nepse_homepage_s
 2026-11-24 19:28:05,2026-11-25 01:13 NPT (Wednesday),schedule,US,True,200,14,15,200,2026-11-23
 2026-11-25 15:58:53,2026-11-25 21:43 NPT (Wednesday),schedule,US,True,200,15,15,200,2026-11-24
 2026-11-25 18:36:58,2026-11-26 00:21 NPT (Thursday),schedule,US,True,200,14,15,200,2026-11-24
+2026-11-26 15:40:10,2026-11-26 21:25 NPT (Thursday),schedule,US,True,200,15,15,200,2026-11-25
