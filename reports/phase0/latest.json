@@ -1,13 +1,13 @@
 {
-  "run_at_utc": "2026-11-27 15:30:03",
-  "run_at_npt": "2026-11-27 21:15 NPT (Friday)",
+  "run_at_utc": "2026-11-27 18:05:15",
+  "run_at_npt": "2026-11-27 23:50 NPT (Friday)",
   "trigger": "schedule",
   "runner": {
-    "github_runner": "GitHub Actions 1000000519",
+    "github_runner": "GitHub Actions 1000000528",
     "runner_os": "Linux",
-    "ip": "20.186.239.88",
-    "city": "Des Moines",
-    "region": "Iowa",
+    "ip": "74.235.86.205",
+    "city": "Dulles Town Center",
+    "region": "Virginia",
     "country": "US",
     "org": "AS8075 Microsoft Corporation"
   },
@@ -39,7 +39,7 @@
         "user_agent": "honest",
         "reachable": true,
         "status": 200,
-        "seconds": 1.01,
+        "seconds": 1.38,
         "final_url": "https://www.nepalstock.com/",
         "bytes": 2830,
         "content_type": "text/html",
@@ -53,7 +53,7 @@
         "user_agent": "honest",
         "reachable": true,
         "status": 200,
-        "seconds": 1.71,
+        "seconds": 0.95,
         "final_url": "https://www.nepalstock.com/robots.txt",
         "bytes": 2830,
         "content_type": "text/html",
@@ -69,7 +69,7 @@
         "user_agent": "browser",
         "reachable": true,
         "status": 401,
-        "seconds": 1.05,
+        "seconds": 1.53,
         "final_url": "https://www.nepalstock.com/api/nots/nepse-data/market-open",
         "bytes": 87,
         "content_type": "text/html;charset=UTF-8",
@@ -84,7 +84,7 @@
         "calls": {
           "market_status": {
             "ok": true,
-            "seconds": 1.84,
+            "seconds": 1.78,
             "requests": 2,
             "type": "dict",
             "fields": [
@@ -147,7 +147,7 @@
           },
           "company_list": {
             "ok": true,
-            "seconds": 0.52,
+            "seconds": 0.53,
             "requests": 1,
             "type": "list",
             "count": 652,
@@ -182,7 +182,7 @@
           },
           "security_list": {
             "ok": true,
-            "seconds": 0.51,
+            "seconds": 0.52,
             "requests": 1,
             "type": "list",
             "count": 573,
@@ -220,7 +220,7 @@
           },
           "live_market": {
             "ok": true,
-            "seconds": 0.25,
+            "seconds": 0.26,
             "requests": 1,
             "type": "list",
             "count": 0,
@@ -248,7 +248,7 @@
           },
           "index_intraday_graph": {
             "ok": true,
-            "seconds": 0.51,
+            "seconds": 0.52,
             "requests": 2,
             "type": "list",
             "count": 611,
@@ -258,7 +258,7 @@
           },
           "history_NABIL": {
             "ok": true,
-            "seconds": 0.77,
+            "seconds": 0.79,
             "requests": 2,
             "type": "dict",
             "fields": [
@@ -324,7 +324,7 @@
           },
           "intraday_ticks_NABIL": {
             "ok": true,
-            "seconds": 0.26,
+            "seconds": 0.27,
             "requests": 1,
             "type": "list",
             "count": 108,
@@ -376,7 +376,7 @@
         },
         "burst_10_calls": {
           "succeeded": 10,
-          "slowest_seconds": 0.25,
+          "slowest_seconds": 0.26,
           "errors": []
         },
         "request_total": 28,
@@ -393,7 +393,7 @@
           "user_agent": "honest",
           "reachable": true,
           "status": 200,
-          "seconds": 0.21,
+          "seconds": 0.09,
           "final_url": "https://raw.githubusercontent.com/Aabishkar2/nepse-data/main/data/company-wise/NABIL.csv",
           "bytes": 223063,
           "content_type": "text/plain; charset=utf-8",
@@ -441,7 +441,7 @@
           "user_agent": "honest",
           "reachable": true,
           "status": 200,
-          "seconds": 0.21,
+          "seconds": 0.07,
           "final_url": "https://raw.githubusercontent.com/Aabishkar2/nepse-data/main/data/company-wise/ACLBSL.csv",
           "bytes": 86106,
           "content_type": "text/plain; charset=utf-8",
@@ -490,7 +490,7 @@
         "user_agent": "honest",
         "reachable": true,
         "status": 200,
-        "seconds": 0.42,
+        "seconds": 0.32,
         "final_url": "https://api.github.com/repos/Aabishkar2/nepse-data/commits?per_page=1",
         "bytes": 3323,
         "content_type": "application/json; charset=utf-8",
@@ -499,7 +499,7 @@
         "rate_headers": {
           "x-ratelimit-limit": "5000",
           "x-ratelimit-remaining": "4999",
-          "x-ratelimit-reset": "1795797056"
+          "x-ratelimit-reset": "1795806366"
         },
         "block_signals": [],
         "date": "2026-11-26T21:59:31Z"
@@ -524,7 +524,7 @@
         "user_agent": "honest",
         "reachable": true,
         "status": 200,
-        "seconds": 0.15,
+        "seconds": 0.04,
         "final_url": "https://www.sharesansar.com/robots.txt",
         "bytes": 24,
         "content_type": "text/plain; charset=utf-8",
@@ -539,7 +539,7 @@
         "user_agent": "honest",
         "reachable": true,
         "status": 200,
-        "seconds": 1.87,
+        "seconds": 1.74,
         "final_url": "https://www.sharesansar.com/today-share-price",
         "bytes": 752697,
         "content_type": "text/html; charset=utf-8",
@@ -601,7 +601,7 @@
         "user_agent": "honest",
         "reachable": true,
         "status": 200,
-        "seconds": 1.12,
+        "seconds": 0.99,
         "final_url": "https://merolagani.com/robots.txt",
         "bytes": 616,
         "content_type": "text/html; charset=utf-8",
@@ -616,7 +616,7 @@
         "user_agent": "honest",
         "reachable": true,
         "status": 200,
-        "seconds": 5.5,
+        "seconds": 3.68,
         "final_url": "https://merolagani.com/LatestMarket.aspx",
         "bytes": 284683,
         "content_type": "text/html; charset=utf-8",
@@ -651,7 +651,7 @@
         "user_agent": "honest",
         "reachable": true,
         "status": 200,
-        "seconds": 0.07,
+        "seconds": 0.04,
         "final_url": "https://nepsealpha.com/robots.txt",
         "bytes": 167,
         "content_type": "text/plain; charset=utf-8",
@@ -666,7 +666,7 @@
         "user_agent": "honest",
         "reachable": true,
         "status": 200,
-        "seconds": 1.36,
+        "seconds": 1.25,
         "final_url": "https://nepsealpha.com/",
         "bytes": 299407,
         "content_type": "text/html; charset=utf-8",
@@ -684,7 +684,7 @@
           "user_agent": "honest",
           "reachable": true,
           "status": 404,
-          "seconds": 0.16,
+          "seconds": 0.12,
           "final_url": "https://shubhamnpk.github.io/yonepse/data/market_status.json",
           "bytes": 9379,
           "content_type": "text/html; charset=utf-8",
@@ -698,7 +698,7 @@
           "user_agent": "honest",
           "reachable": true,
           "status": 200,
-          "seconds": 0.06,
+          "seconds": 0.02,
           "final_url": "https://shubhamnpk.github.io/yonepse/data/nepse_data.json",
           "bytes": 142837,
           "content_type": "application/json; charset=utf-8",
@@ -730,7 +730,7 @@
           "user_agent": "honest",
           "reachable": true,
           "status": 404,
-          "seconds": 0.12,
+          "seconds": 0.04,
           "final_url": "https://shubhamnpk.github.io/yonepse/data/upcoming_ipo.json",
           "bytes": 9379,
           "content_type": "text/html; charset=utf-8",
@@ -742,5 +742,5 @@
       }
     }
   },
-  "duration_seconds": 79.0
+  "duration_seconds": 75.7
 }
